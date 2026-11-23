@@ -8,7 +8,7 @@ export type { AssetReferenceList };
 
 export class AssetsReferencesResource extends Resource {
   /**
-   * Returns saved draft and published usage visible to the caller. Email-template references also require email_management:read. Hidden resources do not affect truncated; unsaved edits and older published versions are excluded.
+   * Returns saved draft and published usage visible to the caller. Email-template and reusable-block references also require email_management:read. Hidden resources do not affect truncated; unsaved edits and older published versions are excluded.
    *
    * @example Find permitted references
    * const references = await bird.assets.references.list(

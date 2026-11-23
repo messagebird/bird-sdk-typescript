@@ -299,40 +299,6 @@ export const WebhookEventSchema = {
   },
 } as const;
 
-export const SortOrderSchema = {
-  type: "string",
-  enum: ["asc", "desc"],
-  description: "Sort direction, ascending or descending.",
-} as const;
-
-export const BrandIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^bnd_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "bnd_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
-export const TimestampsSchema = {
-  type: "object",
-  required: ["created_at", "updated_at"],
-  properties: {
-    created_at: {
-      type: "string",
-      format: "date-time",
-      minLength: 1,
-      readOnly: true,
-      example: "2026-05-20T09:14:52Z",
-    },
-    updated_at: {
-      type: "string",
-      format: "date-time",
-      minLength: 1,
-      readOnly: true,
-      example: "2026-05-25T16:42:01Z",
-    },
-  },
-} as const;
-
 export const _ListEnvelopeSchema = {
   type: "object",
   required: ["next_cursor", "prev_cursor", "refresh_cursor"],
@@ -356,6 +322,27 @@ export const _ListEnvelopeSchema = {
         "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
       example:
         "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
+    },
+  },
+} as const;
+
+export const TimestampsSchema = {
+  type: "object",
+  required: ["created_at", "updated_at"],
+  properties: {
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      example: "2026-05-20T09:14:52Z",
+    },
+    updated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      example: "2026-05-25T16:42:01Z",
     },
   },
 } as const;
@@ -598,6 +585,19 @@ export const ErrorSchema = {
       $ref: "#/components/schemas/ErrorBody",
     },
   },
+} as const;
+
+export const SortOrderSchema = {
+  type: "string",
+  enum: ["asc", "desc"],
+  description: "Sort direction, ascending or descending.",
+} as const;
+
+export const BrandIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^bnd_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "bnd_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const TemplateSlugSchema = {
@@ -1578,7 +1578,7 @@ export const EmailStatsSummaryPeriodSchema = {
       format: "date-time",
       readOnly: true,
       description:
-        'The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response reflects data from up to a few seconds ago. Use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.\n',
+        'The best-effort refresh time of the statistics in this response; when they come from several rollups, it is the oldest of their latest refreshes. Events recorded before roughly this time are usually reflected, while more recent events may not be yet. Statistics are served from rolling aggregations that usually refresh within a minute, so a response can trail the latest events by a minute or more. Use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are up to the second. Null when the freshness boundary is not being reported.\n',
       example: "2026-05-25T14:03:10Z",
     },
   },
@@ -2335,7 +2335,7 @@ export const EmailStatsPeriodSchema = {
       format: "date-time",
       readOnly: true,
       description:
-        'The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response reflects data from up to a few seconds ago. Use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.\n',
+        'The best-effort refresh time of the statistics in this response; when they come from several rollups, it is the oldest of their latest refreshes. Events recorded before roughly this time are usually reflected, while more recent events may not be yet. Statistics are served from rolling aggregations that usually refresh within a minute, so a response can trail the latest events by a minute or more. Use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are up to the second. Null when the freshness boundary is not being reported.\n',
       example: "2026-05-25T14:03:10Z",
     },
   },
@@ -8017,7 +8017,7 @@ export const EmailMessageSchema = {
       ],
       readOnly: true,
       description:
-        "The exact template version this send rendered from, or null for an inline send. A template's live version changes every time you submit it, so this is what identifies the wording that was actually delivered, together with `resolved_language`.\n",
+        "The exact template version this send rendered from, or null for an inline send. A template's live version changes every time you submit it, so this identifies the source of the send, together with `resolved_language`. Reading that version later does not reproduce the delivered wording when the template links a reusable block, because the block shows its latest published content. The stored message content holds the delivered body while it is available.\n",
     },
     broadcast_id: {
       $ref: "#/components/schemas/EmailBroadcastID",
@@ -8403,7 +8403,7 @@ export const EmailMessageSendRequestSchema = {
       type: "string",
       format: "date-time",
       description:
-        "Send at this future time instead of immediately, at least 30 seconds and at most 30 days ahead; outside that range returns `422`. The message returns `accepted` and reads as `scheduled` until it sends, and the message cancel endpoint cancels it before then. Scheduled sends count against your plan's monthly scheduled-email allowance, and a send over it returns `422`. A stored template's published version, language and parameter values are pinned at acceptance, so a later publication does not change what sends; deleting the template before the message is due rejects it with `generation_failure`. Sender eligibility and send-volume allowance are checked again when it is due. Batch items take this field too, so one batch can mix scheduled and immediate messages.",
+        "Send at this future time instead of immediately, at least 30 seconds and at most 30 days ahead; outside that range returns `422`. The message returns `accepted` and reads as `scheduled` until it sends, and the message cancel endpoint cancels it before then. Scheduled sends count against your plan's monthly scheduled-email allowance, and a send over it returns `422`. A stored template's published version, language and parameter values are pinned at acceptance, so a later publication does not change what sends; deleting the template before the message is due rejects it with `generation_failure`. Sender eligibility and send-volume allowance are checked again when it is due. Bodies and attachment contents count toward the same 20 MB message limit as an immediate send. The rest of the request, such as recipients, `headers`, `metadata`, parameters and attachment file names, shares a separate 31 KB limit, and a send over it returns `422`. Batch items take this field too, so one batch can mix scheduled and immediate messages.",
     },
     brand_id: {
       oneOf: [
@@ -8567,7 +8567,7 @@ export const EmailMessageBatchItemSchema = {
       ],
       readOnly: true,
       description:
-        "The exact template version this item rendered from, or null for an inline item. Record it if you need to reproduce what was sent: a template's live version changes every time you submit it.\n",
+        "The exact template version this item rendered from, or null for an inline item. Record it to know which version a message came from: a template's live version changes every time you submit it. Reading that version later does not reproduce the delivered wording when the template links a reusable block, because the block shows its latest published content. The stored message content holds the delivered body while it is available.\n",
     },
     scheduled_at: {
       type: "string",
@@ -9046,6 +9046,33 @@ export const ContactIDSchema = {
   example: "con_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const EmailBroadcastAutomaticSeedingSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["enabled", "example_contact_id"],
+  properties: {
+    enabled: {
+      type: "boolean",
+      description:
+        "Whether the broadcast sends seed copies. False sends none, even when the audience contains a contact at the trigger address.",
+    },
+    example_contact_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/ContactID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The contact whose values fill the personal fields in the seed copies. It belongs to this workspace but need not be in the audience; choosing it does not change who receives the broadcast. Null when personal fields use their fallback values.\n",
+    },
+  },
+  description:
+    "How a broadcast takes part in automatic seeding. The seed pool, engagement profile and regions come from the workspace's automatic seeding settings.\n",
+} as const;
+
 export const EmailBroadcastParameterNameSchema = {
   type: "string",
   pattern: "^[A-Za-z_][A-Za-z0-9_]*$",
@@ -9173,7 +9200,7 @@ export const EmailBroadcastParameterProblemCodeSchema = {
   type: "string",
   minLength: 1,
   description:
-    "What a broadcast input diagnostic found.\n\n- `parameter_json_invalid`: the request body or an input map is not valid JSON.\n- `parameter_map_invalid`: `template.parameters` or `template.parameter_overrides` is not a JSON object of input names.\n- `parameter_name_invalid`: an input name is not a bare name outside the `bird` namespace.\n- `parameter_value_unsupported`: an input value is an object or a list. Values must be a string, number, boolean or null.\n- `parameter_liquid_unsupported`: an input value the email uses contains Liquid, such as `{{` or `{%`. Values are sent as written, so the broadcast cannot send; put Liquid in the template instead.\n- `parameter_duplicate_key`: an input name, or two spellings of one language tag, appears twice.\n- `parameter_bytes_exceeded`: an input map is larger than 16384 UTF-8 bytes.\n- `parameter_names_exceeded`: `template.parameters` and every language together hold more than 128 distinct names.\n- `parameter_depth_exceeded`: an input value is nested too deeply.\n- `parameter_language_invalid`: a `template.parameter_overrides` key is not a valid BCP-47 language tag.\n- `parameter_required`: the template or envelope uses an input that has no value.\n- `sensitive_input_unsupported`: the template uses an input it marks sensitive, which a broadcast cannot supply.\n- `render_profile_unsupported`: the template uses a Liquid operation that rendering with broadcast inputs does not support.\n- `rendered_envelope_invalid`: the rendered subject, sender name, reply-to addresses or a header is not valid for an email, for example because it contains a line break.\n- `contact_property_unknown`: the template reads a contact property this workspace has not defined.\n- `template_unavailable`: the broadcast has no template, or its template no longer exists or has no published version.\n- `language_unavailable`: the published version has no content in the selected language.\n- `sender_unavailable`: the broadcast cannot send from its `from` address or IP pool.\n- `brand_unavailable`: the saved Brand is archived or unavailable for selection. Preview with an available Brand override before sending a test.\n- `audience_unavailable`: the broadcast's audience cannot be used for this send.\n- `recipient_render_failed`: content could not be rendered for a recipient while the broadcast was sending.\n- `render_budget_exceeded`: rendering went over a limit, named by `budget` with its `limit`.\n- `transport_missing`: the saved content of a prepared broadcast is unavailable. Contact Bird support.\n- `transport_invalid`: the saved content of a prepared broadcast no longer matches what was prepared. Contact Bird support.\n",
+    "What a broadcast input diagnostic found.\n\n- `parameter_json_invalid`: the request body or an input map is not valid JSON.\n- `parameter_map_invalid`: `template.parameters` or `template.parameter_overrides` is not a JSON object of input names.\n- `parameter_name_invalid`: an input name is not a bare name outside the `bird` namespace.\n- `parameter_value_unsupported`: an input value is an object or a list. Values must be a string, number, boolean or null.\n- `parameter_liquid_unsupported`: an input value the email uses contains Liquid, such as `{{` or `{%`. Values are sent as written, so the broadcast cannot send; put Liquid in the template instead.\n- `parameter_duplicate_key`: an input name, or two spellings of one language tag, appears twice.\n- `parameter_bytes_exceeded`: an input map is larger than 16384 UTF-8 bytes.\n- `parameter_names_exceeded`: `template.parameters` and every language together hold more than 128 distinct names.\n- `parameter_depth_exceeded`: an input value is nested too deeply.\n- `parameter_language_invalid`: a `template.parameter_overrides` key is not a valid BCP-47 language tag.\n- `parameter_required`: the template or envelope uses an input that has no value.\n- `sensitive_input_unsupported`: the template uses an input it marks sensitive, which a broadcast cannot supply.\n- `render_profile_unsupported`: the template uses a Liquid operation that rendering with broadcast inputs does not support.\n- `rendered_envelope_invalid`: the rendered subject, sender name, reply-to addresses or a header is not valid for an email, for example because it contains a line break.\n- `contact_property_unknown`: the template reads a contact property this workspace has not defined.\n- `template_unavailable`: the broadcast has no template, or its template no longer exists or has no published version.\n- `language_unavailable`: the published version has no content in the selected language.\n- `sender_unavailable`: the broadcast cannot send from its `from` address or IP pool.\n- `brand_unavailable`: the saved Brand is archived or unavailable for selection. Preview with an available Brand override before sending a test.\n- `audience_unavailable`: the broadcast's audience cannot be used for this send.\n- `recipient_render_failed`: content could not be rendered for a recipient while the broadcast was sending.\n- `render_budget_exceeded`: rendering went over a limit, named by `budget` with its `limit`.\n- `transport_missing`: the saved content of a prepared broadcast is unavailable. Contact Bird support.\n- `transport_invalid`: the saved content of a prepared broadcast no longer matches what was prepared. Contact Bird support.\n- `seed_example_value_missing`: automatic seeding has no example contact, and the template requires the contact field at `pointer`, which has no fallback value. Choose an example contact or give the field a fallback value. Seed copies are not sent until then.\n- `seeding_not_configured`: automatic seeding is on, but the workspace's automatic seeding settings are not saved or are turned off. Save them before sending, or no seed copies are sent.\n- `seed_tests_exhausted`: automatic seeding is on, but the organization has no seed tests left this period, so no seed copies are sent.\n",
   "x-extensible-enum": [
     "parameter_json_invalid",
     "parameter_map_invalid",
@@ -9199,6 +9226,9 @@ export const EmailBroadcastParameterProblemCodeSchema = {
     "render_budget_exceeded",
     "transport_missing",
     "transport_invalid",
+    "seed_example_value_missing",
+    "seeding_not_configured",
+    "seed_tests_exhausted",
   ],
   example: "parameter_required",
 } as const;
@@ -9216,8 +9246,8 @@ export const EmailBroadcastParameterProblemSeveritySchema = {
   type: "string",
   minLength: 1,
   description:
-    "How a broadcast input diagnostic affects sending.\n\n- `error`: the broadcast cannot send until the problem is fixed.\n",
-  "x-extensible-enum": ["error"],
+    "How a broadcast input diagnostic affects sending.\n\n- `error`: the broadcast cannot send until the problem is fixed.\n- `warning`: the broadcast can send, but something it asks for will not happen, such as its automatic seed test.\n",
+  "x-extensible-enum": ["error", "warning"],
   example: "error",
 } as const;
 
@@ -9334,6 +9364,18 @@ export const EmailBroadcastSchema = {
     "sent_at",
   ],
   properties: {
+    automatic_seeding: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailBroadcastAutomaticSeeding",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The broadcast's automatic seeding choice, or null when a seed test starts only from a contact at the workspace's trigger address in the audience. Returned on single-broadcast reads and on create and update responses to callers with Inbox Insights read and contact read permission. Not included in lists.\n",
+    },
     id: {
       type: "string",
       minLength: 1,
@@ -9700,6 +9742,30 @@ export const EmailBroadcastListSchema = {
   ],
 } as const;
 
+export const EmailBroadcastAutomaticSeedingInputSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["enabled"],
+  properties: {
+    enabled: {
+      type: "boolean",
+      description:
+        "Whether the broadcast sends seed copies. False sends none, even when the audience contains a contact at the trigger address. A seeded send spends one of the organization's seed tests. When the workspace's automatic seeding is off or the organization has no seed tests left, the broadcast still sends without seed copies; validate the broadcast first to see these as warnings.\n",
+    },
+    example_contact_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ContactID",
+        },
+      ],
+      description:
+        "A contact whose values fill the personal fields in the seed copies, such as a first name. It must belong to this workspace but need not be in the audience; choosing it does not change who receives the broadcast. Its details reach external seed mailboxes, so use a test contact. While seeding is enabled, sending refuses a chosen contact that has since been deleted, so choose another or leave it out. Leave it out to fill personal fields with their fallback values.\n",
+    },
+  },
+  description:
+    "How a broadcast takes part in automatic seeding. The seed pool, engagement profile and regions come from the workspace's automatic seeding settings.\n",
+} as const;
+
 export const EmailBroadcastTemplateCreateSchema = {
   type: "object",
   additionalProperties: false,
@@ -9750,6 +9816,15 @@ export const EmailBroadcastCreateRequestSchema = {
   description:
     "A broadcast sends one email to a whole audience. Every field here is optional, so you can create an empty draft and fill it in later. To actually send, a broadcast needs three things: a `from` address on a verified domain, an `audience_id`, and a `template`.\n\nLeave `send` false, which is the default, and you get a draft. Update it as often as you like, then send it when you are ready. Set `send` to true and the broadcast goes out as soon as it is created, or at `scheduled_at` if you set one.\n",
   properties: {
+    automatic_seeding: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailBroadcastAutomaticSeedingInput",
+        },
+      ],
+      description:
+        "Whether this broadcast sends seed copies for an automatic seed test. Leave it out to start a seed test only when the audience contains a contact at the workspace's trigger address. Send `enabled: false` to send no seed copies at all. Needs Inbox Insights write permission, and contact read permission to choose an example contact. Turning seeding on returns `404 not_found` while automatic seeding is unavailable to the workspace.\n",
+    },
     from: {
       $ref: "#/components/schemas/EmailAddressInput",
       description:
@@ -9905,6 +9980,18 @@ export const EmailBroadcastUpdateRequestSchema = {
   description:
     "Changes a broadcast that is still a draft or is scheduled. Whatever you send here is applied, and anything you leave out keeps the value it already had. Once a broadcast has started sending it can no longer be edited.\n",
   properties: {
+    automatic_seeding: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailBroadcastAutomaticSeedingInput",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Replaces the broadcast's automatic seeding choice. Leave it out to keep the saved choice. Send null to start a seed test only when the audience contains a contact at the workspace's trigger address. An object without `example_contact_id` removes the example contact, so seed copies use fallback values. Needs Inbox Insights write permission, and contact read permission to choose an example contact. Turning seeding on, or changing it while it is on, returns `404 not_found` while automatic seeding is unavailable to the workspace. Resending the saved choice, turning it off and sending null still succeed.\n",
+    },
     from: {
       $ref: "#/components/schemas/EmailAddressInput",
       description:
@@ -10422,7 +10509,7 @@ export const EmailBroadcastValidationResultSchema = {
         $ref: "#/components/schemas/EmailBroadcastParameterProblem",
       },
       description:
-        "The problems found. Empty when `ready_for_admission` is true.",
+        "The problems found. Problems with severity `error` block sending, and none remain when `ready_for_admission` is true. Problems with severity `warning` do not block sending.",
     },
     unused_parameters: {
       type: "array",
@@ -10635,7 +10722,7 @@ export const EmailBroadcastResumeSchema = {
     confirm: {
       type: "boolean",
       description:
-        "Acknowledgment that the message reaches the remaining recipients later than intended. It is required to resume a broadcast that started sending at least 24 hours ago. Before setting it, read the broadcast's `started_at` and have a reviewer with `email_management:read` read its template by `template.id` to check `scope`, then, for a workspace template or one the template read reports deleted (`404`), its pinned version using `template.id` and `template.version_id`. Workspace versions retain the original content. A built-in template (`scope: system`) shows current catalogue content, and only the template read returns `scope`. Broadcasts with frozen content keep it, but older broadcasts can read the catalogue again when resumed. Neither a current lookup nor an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Ask an authorized teammate if you lack that permission. It does not skip the funds or concurrent-broadcast checks.",
+        "Acknowledgment that the message reaches the remaining recipients later than intended. It is required to resume a broadcast that started sending at least 24 hours ago. Before setting it, read the broadcast's `started_at` and have a reviewer with `email_management:read` read its template by `template.id` to check `scope`, then, for a workspace template or one the template read reports deleted (`404`), its pinned version using `template.id` and `template.version_id`. Workspace versions retain the template's own original content; sections linked from reusable blocks show as currently published. A built-in template (`scope: system`) shows current catalogue content, and only the template read returns `scope`. Broadcasts with frozen content keep it, but older broadcasts can read the catalogue again when resumed. Neither a current lookup nor an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Ask an authorized teammate if you lack that permission. It does not skip the funds or concurrent-broadcast checks.",
     },
   },
   example: {
@@ -11473,6 +11560,20 @@ export const PreferenceSchema = {
           readOnly: true,
           description:
             "The contact whose handle matched when the statement was recorded. Null when no contact matched at that moment; it is not updated when contacts change later.",
+        },
+        complaint_message_id: {
+          example: null,
+          oneOf: [
+            {
+              $ref: "#/components/schemas/EmailID",
+            },
+            {
+              type: "null",
+            },
+          ],
+          readOnly: true,
+          description:
+            "The email that caused the most recent recorded spam complaint for this preference. Null when no complaint is recorded. Retained after a newer individual opt-in clears complaint protection; check status and origin for the current preference.",
         },
         brand_id: {
           oneOf: [
@@ -16582,7 +16683,7 @@ export const AssetReferenceSchema = {
       type: "string",
       minLength: 1,
       readOnly: true,
-      "x-extensible-enum": ["email_template"],
+      "x-extensible-enum": ["email_template", "email_block"],
       description:
         "What kind of resource this is. New kinds appear as other products start using the media library, so treat an unfamiliar value as a resource this client does not know how to link to rather than as an error.",
     },
@@ -16591,7 +16692,7 @@ export const AssetReferenceSchema = {
       minLength: 1,
       readOnly: true,
       description:
-        "The resource's own identifier, carrying that resource's prefix (`emt_` for an email template), for linking straight to it.",
+        "The resource's own identifier, carrying that resource's prefix: `emt_` for an email template, `ebl_` for a reusable email block. A reusable block is identified here by ID and name; the API does not yet return its content.",
       example: "emt_01j9zyq8k7f0ra2m6c4x5w8pv3",
     },
     resource_name: {
@@ -37600,7 +37701,7 @@ export const EmailStatsSeriesPeriodSchema = {
       format: "date-time",
       readOnly: true,
       description:
-        "The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response reflects data from up to a few seconds ago. Use this field to label data freshness rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.\n",
+        "The best-effort refresh time of the statistics in this response; when they come from several rollups, it is the oldest of their latest refreshes. Events recorded before roughly this time are usually reflected, while more recent events may not be yet. Statistics are served from rolling aggregations that usually refresh within a minute, so a response can trail the latest events by a minute or more. Use this field to label data freshness rather than assuming the numbers are up to the second. Null when the freshness boundary is not being reported.\n",
       example: "2026-05-25T14:03:10Z",
     },
   },
@@ -41672,6 +41773,772 @@ export const EmailCompetitiveVolumeSeriesSchema = {
   },
 } as const;
 
+export const EmailBlockSortFieldSchema = {
+  type: "string",
+  description: "Field used to order reusable email blocks.",
+  enum: ["created_at", "name"],
+  default: "created_at",
+} as const;
+
+export const EmailBlockIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^ebl_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "ebl_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EmailBlockSchema = {
+  readOnly: true,
+  description:
+    "A reusable email section with independently editable languages.",
+  allOf: [
+    {
+      type: "object",
+      required: ["id", "name", "source_language", "revision", "created_by"],
+      properties: {
+        id: {
+          $ref: "#/components/schemas/EmailBlockID",
+        },
+        name: {
+          type: "string",
+          description:
+            "Name for people choosing the block, such as when linking it into a template.",
+          minLength: 1,
+          maxLength: 100,
+          example: "Legal disclosure",
+        },
+        description: {
+          type: "string",
+          maxLength: 2000,
+          description:
+            "Optional notes for people maintaining the block. Omitted when empty.",
+        },
+        source_language: {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        revision: {
+          type: "integer",
+          format: "int64",
+          minimum: 1,
+          description:
+            "Metadata revision to send when editing or duplicating this block.",
+          example: 1,
+        },
+        created_by: {
+          $ref: "#/components/schemas/Actor",
+          description:
+            "Who created the block. A duplicate is created by whoever duplicated it.",
+        },
+        archived_at: {
+          type: "string",
+          format: "date-time",
+          description:
+            "Present when the block is archived. Retained published content remains readable.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const EmailBlockListSchema = {
+  description: "A page of blocks.",
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/EmailBlock",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const EmailBlockFragmentSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One self-contained email section. Version 2 is a section written as HTML and sends `fragment_html` alone; the API, SDKs, CLI and MCP write version 2. Version 1 is reserved for sections built in the Bird dashboard's visual editor, and only the dashboard saves it. A block language keeps the version it was created with.",
+  required: ["serializer_version", "fragment_html"],
+  not: {
+    required: ["serializer_version", "editor_state"],
+    properties: {
+      serializer_version: {
+        enum: [2],
+      },
+      editor_state: {},
+    },
+  },
+  properties: {
+    serializer_version: {
+      type: "integer",
+      minimum: 1,
+      maximum: 2,
+      description:
+        "How this section is written. 2 is HTML written directly, and is the value to send from the API, SDKs, CLI and MCP. 1 is reserved for the Bird dashboard's visual editor; other callers get a `422` for it.",
+      example: 2,
+    },
+    fragment_html: {
+      type: "string",
+      minLength: 0,
+      maxLength: 524288,
+      "x-sensitive": true,
+      description:
+        "Section HTML. Unfinished markup can be saved as a draft; validation checks readiness separately. A version 2 section is one presentation table with one `tbody`, `tr` and `td`, and all layout stays inside that cell. The cell sets `lang` to the block language and its own typography: `font-family`, a `font-size` in pixels, `font-style`, `font-weight`, `line-height`, `letter-spacing`, `text-align` (not `start` or `end`), `text-transform`, `color`, `margin` and `padding`. Root-relative units such as `rem` are refused; use px, em or percentages. Liquid stays balanced inside the cell, cannot use `assign`, `capture`, `increment` or `decrement`, and puts no control tag inside an attribute or style value. `{{ bird.unsubscribe_url }}` appears only as bare text or as the entire `href` of an `<a>`, and never inside an `if !mso` conditional comment, which Outlook skips. No document wrapper, `<style>`, script, form, `class` or `id` attribute. A table nested in the cell needs its own `<tbody>`. Inside a complete Outlook conditional comment, prefixed Office and VML elements such as `v:fill` may self-close, and a balanced `if !mso` conditional comment that shows its content outside Outlook is accepted when it holds no other conditional comment.",
+      example:
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tbody><tr><td lang="en" style="font-family: Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: normal; line-height: 20px; letter-spacing: normal; text-align: left; text-transform: none; color: #333333; margin: 0; padding: 16px;"><p style="margin: 0;">Your disclosure text.</p></td></tr></tbody></table>',
+    },
+  },
+} as const;
+
+export const EmailBlockCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Create an unpublished block and its source-language draft.",
+  required: ["name", "source_language"],
+  properties: {
+    name: {
+      type: "string",
+      description:
+        "Name for people choosing the block, such as when linking it into a template.",
+      minLength: 1,
+      maxLength: 100,
+      example: "Legal disclosure",
+    },
+    description: {
+      type: "string",
+      maxLength: 2000,
+      description: "Optional notes for people maintaining the block.",
+    },
+    source_language: {
+      $ref: "#/components/schemas/LanguageTag",
+    },
+    fragment: {
+      $ref: "#/components/schemas/EmailBlockFragment",
+      description:
+        "Initial source-language content, as an HTML section. Its `serializer_version` sets the language's authoring mode. Leaving it out returns a `422` `validation_error`, except in the Bird dashboard, which starts an empty visual draft.",
+    },
+  },
+  example: {
+    name: "Legal disclosure",
+    source_language: "en",
+    fragment: {
+      serializer_version: 2,
+      fragment_html:
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tbody><tr><td lang="en" style="font-family: Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: normal; line-height: 20px; letter-spacing: normal; text-align: left; text-transform: none; color: #333333; margin: 0; padding: 16px;"><p style="margin: 0;">Your disclosure text.</p></td></tr></tbody></table>',
+    },
+  },
+} as const;
+
+export const EmailBlockFragmentValidationRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Check a section's markup, variables and contact properties without saving it.",
+  required: ["language", "fragment"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+    },
+    fragment: {
+      $ref: "#/components/schemas/EmailBlockFragment",
+    },
+  },
+  example: {
+    language: "en",
+    fragment: {
+      serializer_version: 2,
+      fragment_html:
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tbody><tr><td lang="en" style="font-family: Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: normal; line-height: 20px; letter-spacing: normal; text-align: left; text-transform: none; color: #333333; margin: 0; padding: 16px;"><p style="margin: 0;">Your disclosure text.</p></td></tr></tbody></table>',
+    },
+  },
+} as const;
+
+export const EmailBlockFragmentValidationSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Successful section validation. Validation neither saves nor publishes content.",
+  required: ["text"],
+  properties: {
+    text: {
+      type: "string",
+      "x-sensitive": true,
+      minLength: 0,
+      description: "Plain text derived from this section's HTML.",
+    },
+  },
+} as const;
+
+export const EmailBlockUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Change block metadata without changing its content or publication state.",
+  required: ["revision"],
+  properties: {
+    revision: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description:
+        "Metadata revision last read. A concurrent change returns 409.",
+      example: 1,
+    },
+    name: {
+      type: "string",
+      description: "New name for the block.",
+      minLength: 1,
+      maxLength: 100,
+    },
+    description: {
+      type: "string",
+      maxLength: 2000,
+      description:
+        "Replacement maintenance notes. Send an empty string to clear them.",
+    },
+    source_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description:
+        "An existing block language. It can change only before the first publication.",
+    },
+    archived: {
+      type: "boolean",
+      description:
+        "Archive or unarchive the block. Archiving retains its content and history.",
+    },
+  },
+} as const;
+
+export const EmailBlockDuplicateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Copy all current draft languages into a new unpublished block.",
+  required: ["revision", "name"],
+  properties: {
+    revision: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description:
+        "Source metadata revision last read. A change while copying returns 409.",
+      example: 1,
+    },
+    name: {
+      type: "string",
+      description: "Name for the new block.",
+      minLength: 1,
+      maxLength: 100,
+      example: "Legal disclosure copy",
+    },
+  },
+} as const;
+
+export const EmailBlockPublishLanguageSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One language to publish and the draft revision it must still be at.",
+  required: ["language", "revision"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+    },
+    revision: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description: "Draft revision last read. A newer saved draft returns 409.",
+      example: 8,
+    },
+  },
+} as const;
+
+export const EmailBlockPublishSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Publish the current drafts of the named languages. They go live together or not at all.",
+  required: ["languages"],
+  properties: {
+    languages: {
+      type: "array",
+      minItems: 1,
+      maxItems: 25,
+      description:
+        "Languages to publish, each with the draft revision last read.",
+      items: {
+        $ref: "#/components/schemas/EmailBlockPublishLanguage",
+      },
+    },
+    confirm: {
+      type: "boolean",
+      default: false,
+      description:
+        "Publish even though live templates that use this block will start requiring inputs this publication adds. Without it, such a publication returns 409 naming the inputs and templates.",
+    },
+  },
+  example: {
+    languages: [
+      {
+        language: "en",
+        revision: 2,
+      },
+    ],
+  },
+} as const;
+
+export const EmailBlockSubmissionIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^ebs_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "ebs_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EmailBlockSubmissionStatusSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["published"],
+  description:
+    "Where a block change is in its lifecycle. `published` means its revisions are live. New values may be added; treat an unknown value as not yet live.",
+  example: "published",
+} as const;
+
+export const EmailBlockRevisionIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^ebr_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "ebr_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EmailBlockSubmissionLanguageSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description: "One language included in a block change.",
+  required: ["language", "draft_revision", "candidate_revision_id"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+    },
+    draft_revision: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description: "Draft revision this snapshot was taken from.",
+      example: 8,
+    },
+    candidate_revision_id: {
+      $ref: "#/components/schemas/EmailBlockRevisionID",
+      description: "Immutable snapshot of the draft at that revision.",
+    },
+  },
+} as const;
+
+export const EmailBlockPublishedRevisionSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "A revision that became the published content of one block language.",
+  required: ["language", "id", "version_number"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+    },
+    id: {
+      $ref: "#/components/schemas/EmailBlockRevisionID",
+    },
+    version_number: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description: "Publication number within this block language.",
+      example: 3,
+    },
+  },
+} as const;
+
+export const EmailBlockSubmissionSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "One block change put forward for publication. A change that needs no review is recorded already published.",
+  required: [
+    "id",
+    "block_id",
+    "status",
+    "languages",
+    "published_revisions",
+    "published_at",
+    "created_at",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/EmailBlockSubmissionID",
+    },
+    block_id: {
+      $ref: "#/components/schemas/EmailBlockID",
+    },
+    status: {
+      $ref: "#/components/schemas/EmailBlockSubmissionStatus",
+    },
+    languages: {
+      type: "array",
+      description:
+        "Each included language, the draft revision it was taken from, and the snapshot frozen for it.",
+      items: {
+        $ref: "#/components/schemas/EmailBlockSubmissionLanguage",
+      },
+    },
+    published_revisions: {
+      type: "array",
+      description:
+        "The revisions that became live when this change was published.",
+      items: {
+        $ref: "#/components/schemas/EmailBlockPublishedRevision",
+      },
+    },
+    published_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      example: "2026-05-25T16:42:01Z",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      example: "2026-05-25T16:42:01Z",
+    },
+  },
+} as const;
+
+export const EmailAuthoringModeSchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  "x-extensible-enum": ["visual", "html"],
+  description:
+    "How this language is edited. `html` content is written as HTML and can be changed through the API, CLI and MCP. `visual` content is built in the Bird dashboard's visual editor; outside the dashboard, a visual section can still be copied by duplicating its block or restoring a published revision. The mode follows from the stored content and cannot be set directly. New values may be added; treat an unknown value as content you cannot edit through the API, CLI or MCP.",
+  example: "html",
+} as const;
+
+export const EmailBlockLanguageFieldsSchema = {
+  type: "object",
+  required: ["language", "revision", "authoring_mode"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+    },
+    revision: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description:
+        "Draft revision to send back when saving or publishing this language, as last returned. It is not a publication number; a published revision is a separate record numbered by `version_number`.",
+      example: 1,
+    },
+    authoring_mode: {
+      $ref: "#/components/schemas/EmailAuthoringMode",
+    },
+    source_revision_id: {
+      $ref: "#/components/schemas/EmailBlockRevisionID",
+      description:
+        "Published source-language revision used for this translation. Omitted when untracked.",
+    },
+    published_revision_id: {
+      $ref: "#/components/schemas/EmailBlockRevisionID",
+      description:
+        "Current published revision for this exact language. Omitted before publication.",
+    },
+  },
+} as const;
+
+export const EmailBlockLanguageSummarySchema = {
+  readOnly: true,
+  description:
+    "One language's draft revision and publication references, without its content.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailBlockLanguageFields",
+    },
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const EmailBlockLanguageListSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "All block languages, ordered by language tag. A block holds at most 25 languages.",
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      maxItems: 25,
+      items: {
+        $ref: "#/components/schemas/EmailBlockLanguageSummary",
+      },
+    },
+  },
+} as const;
+
+export const EmailBlockLanguageSchema = {
+  readOnly: true,
+  description:
+    "Editable content for one exact language. No language fallback is applied.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailBlockLanguageFields",
+    },
+    {
+      type: "object",
+      required: ["fragment"],
+      properties: {
+        fragment: {
+          $ref: "#/components/schemas/EmailBlockFragment",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+  ],
+  unevaluatedProperties: false,
+  example: {
+    language: "en",
+    revision: 2,
+    authoring_mode: "html",
+    published_revision_id: "ebr_01krdgeqcxet5s7t44vh8rt9mg",
+    fragment: {
+      serializer_version: 2,
+      fragment_html:
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tbody><tr><td lang="en" style="font-family: Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: normal; line-height: 20px; letter-spacing: normal; text-align: left; text-transform: none; color: #333333; margin: 0; padding: 16px;"><p style="margin: 0;">Your disclosure text.</p></td></tr></tbody></table>',
+    },
+    created_at: "2026-05-20T09:14:52Z",
+    updated_at: "2026-05-25T16:42:01Z",
+  },
+} as const;
+
+export const EmailBlockLanguageUpsertSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Save a full draft section or copy a retained published revision into its draft. Supply exactly one of fragment or from_revision_id. Copying a revision preserves its source reference and never republishes it. source_revision_id is accepted only with authored fragment content; omitting it clears translation provenance. A new language takes the authoring mode of its first fragment, and an existing language keeps its mode: content in the other mode returns 422.",
+  required: ["revision"],
+  anyOf: [
+    {
+      required: ["fragment"],
+    },
+    {
+      required: ["from_revision_id"],
+    },
+  ],
+  not: {
+    anyOf: [
+      {
+        required: ["fragment", "from_revision_id"],
+        properties: {
+          fragment: {},
+          from_revision_id: {},
+        },
+      },
+      {
+        required: ["source_revision_id", "from_revision_id"],
+        properties: {
+          source_revision_id: {},
+          from_revision_id: {},
+        },
+      },
+    ],
+  },
+  properties: {
+    revision: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Draft revision last read, or zero to create a missing language. A concurrent change returns 409.",
+      example: 1,
+    },
+    fragment: {
+      $ref: "#/components/schemas/EmailBlockFragment",
+    },
+    source_revision_id: {
+      $ref: "#/components/schemas/EmailBlockRevisionID",
+      description:
+        "Published source-language revision this translation was made from. Accepted with `fragment` only; leaving it out clears the reference.",
+    },
+    from_revision_id: {
+      $ref: "#/components/schemas/EmailBlockRevisionID",
+      description:
+        "Published revision of this language to copy back into the draft, sent instead of `fragment`. Copying never publishes.",
+    },
+  },
+  example: {
+    revision: 1,
+    fragment: {
+      serializer_version: 2,
+      fragment_html:
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tbody><tr><td lang="en" style="font-family: Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: normal; line-height: 20px; letter-spacing: normal; text-align: left; text-transform: none; color: #333333; margin: 0; padding: 16px;"><p style="margin: 0;">Your disclosure text.</p></td></tr></tbody></table>',
+    },
+  },
+} as const;
+
+export const EmailBlockRevisionSortFieldSchema = {
+  type: "string",
+  description: "Field used to order a block language's published revisions.",
+  enum: ["version_number"],
+  default: "version_number",
+} as const;
+
+export const EmailBlockRevisionFieldsSchema = {
+  type: "object",
+  readOnly: true,
+  required: [
+    "id",
+    "version_number",
+    "serializer_version",
+    "authoring_mode",
+    "published_by",
+    "published_at",
+    "created_at",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/EmailBlockRevisionID",
+    },
+    version_number: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description:
+        "Publication number within this block language. A draft's `revision` is the value to send back when saving, not a publication number.",
+      example: 1,
+    },
+    serializer_version: {
+      type: "integer",
+      minimum: 1,
+      description:
+        "Format used to save and render this section: 2 for a section written as HTML, 1 for one built in the Bird dashboard's visual editor.",
+      example: 2,
+    },
+    authoring_mode: {
+      $ref: "#/components/schemas/EmailAuthoringMode",
+    },
+    source_revision_id: {
+      $ref: "#/components/schemas/EmailBlockRevisionID",
+      description:
+        "Source-language revision used for this translation. Omitted when untracked.",
+    },
+    published_by: {
+      $ref: "#/components/schemas/Actor",
+      description: "Who published this revision.",
+    },
+    published_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      example: "2026-05-25T16:42:01Z",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      example: "2026-05-25T16:42:01Z",
+    },
+  },
+} as const;
+
+export const EmailBlockRevisionSummarySchema = {
+  readOnly: true,
+  description: "A retained publication without its content.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailBlockRevisionFields",
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const EmailBlockRevisionListSchema = {
+  description: "A page of published block revisions.",
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/EmailBlockRevisionSummary",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const EmailBlockRevisionSchema = {
+  readOnly: true,
+  description: "Retained published content for one exact block language.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailBlockRevisionFields",
+    },
+    {
+      type: "object",
+      readOnly: true,
+      required: ["fragment"],
+      properties: {
+        fragment: {
+          $ref: "#/components/schemas/EmailBlockFragment",
+        },
+      },
+    },
+  ],
+  unevaluatedProperties: false,
+  example: {
+    id: "ebr_01krdgeqcxet5s7t44vh8rt9mg",
+    version_number: 1,
+    serializer_version: 2,
+    authoring_mode: "html",
+    published_by: {
+      id: "key_01krdgeqcxet5s7t44vh8rt9mg",
+      type: "api_key",
+      display_name: "Release pipeline",
+    },
+    fragment: {
+      serializer_version: 2,
+      fragment_html:
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tbody><tr><td lang="en" style="font-family: Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: normal; line-height: 20px; letter-spacing: normal; text-align: left; text-transform: none; color: #333333; margin: 0; padding: 16px;"><p style="margin: 0;">Your disclosure text.</p></td></tr></tbody></table>',
+    },
+    published_at: "2026-05-25T16:42:01Z",
+    created_at: "2026-05-25T16:42:01Z",
+  },
+} as const;
+
 export const EmailTemplateCategorySchema = {
   type: "string",
   minLength: 1,
@@ -41969,12 +42836,80 @@ export const EmailTemplateSourceWriteSchema = {
     "The authoring format to create the template in. `html` is finished markup you provide, optionally personalized with Liquid; a format the API cannot author yet is refused.",
 } as const;
 
+export const EmailTemplateSharedBlockBindingSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The shared block one occurrence in a template language links. The link follows the block's latest published content in that language.",
+  required: ["block_id"],
+  properties: {
+    block_id: {
+      $ref: "#/components/schemas/EmailBlockID",
+    },
+  },
+} as const;
+
+export const EmailTemplateSharedBlocksSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Reusable block links in one template language, keyed by occurrence UUID. Each key matches one HTML comment marker `bird:shared-block:UUID` in the language's HTML. The template language selects the block language, and a link follows the block's latest publication in that language.",
+  required: ["version", "bindings"],
+  properties: {
+    version: {
+      type: "integer",
+      minimum: 1,
+      maximum: 1,
+      description: "Format of these shared section references.",
+      example: 1,
+    },
+    bindings: {
+      type: "object",
+      maxProperties: 100,
+      propertyNames: {
+        type: "string",
+        pattern:
+          "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        not: {
+          const: "00000000-0000-0000-0000-000000000000",
+        },
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/EmailTemplateSharedBlockBinding",
+      },
+      description:
+        "Block references keyed by occurrence UUID, with up to 100 occurrences per language.",
+      example: {
+        "3f2b9c1e-8a4d-4e6f-9b2a-7c5d1e0f4a3b": {
+          block_id: "ebl_01krdgeqcxet5s7t44vh8rt9mg",
+        },
+      },
+    },
+  },
+} as const;
+
 export const EmailTemplateLanguageContentSchema = {
   type: "object",
   additionalProperties: false,
   description:
     "One language's content for an email template. Each language carries its own subject, preview text and bodies, so a translation can differ in wording and length from every other language without affecting them.\n",
   properties: {
+    has_shared_blocks: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether this language links reusable blocks. On ordinary reads, the HTML shows each linked block's current published content and changes when a linked block is published; copying it to a new template creates independent content. Read the language with `authoring=true` for its HTML with block markers and its `shared_blocks`.\n",
+    },
+    shared_blocks: {
+      readOnly: true,
+      description:
+        "The language's block links. Returned only by `authoring=true` reads.",
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateSharedBlocks",
+        },
+      ],
+    },
     subject: {
       type: "string",
       maxLength: 998,
@@ -43087,7 +44022,7 @@ export const EmailTemplateVersionSummarySchema = {
         $ref: "#/components/schemas/TemplateVariable",
       },
       description:
-        "Input definitions this version uses, including caller parameters and reserved Bird inputs. An entry with `system` false is yours to send in `template.parameters`. An entry with `system` true names a reserved Bird key; supported paths receive Bird values. A draft can also report unsupported reserved paths, including bare `bird`, whose `constraint` explains that no Bird value fills them. Correct these paths before publishing. Naming a reserved Bird key in a send is rejected with a `422`.\n\nThe list combines all the languages, because languages do not have to use the same inputs: if the English body uses `discount_code` and the French body uses `shipping_date`, both appear here. A send requires values only for the caller parameters referenced by its resolved language. Preview each language to see its inputs. Extra parameters are ignored; omitting a caller parameter referenced by the resolved language returns a `422` naming it.\n",
+        "Input definitions this version uses, including caller parameters and reserved Bird inputs. An entry with `system` false is yours to send in `template.parameters`. An entry with `system` true names a reserved Bird key; supported paths receive Bird values. A draft can also report unsupported reserved paths, including bare `bird`, whose `constraint` explains that no Bird value fills them. Correct these paths before publishing. Naming a reserved Bird key in a send is rejected with a `422`.\n\nThe list combines all the languages, because languages do not have to use the same inputs: if the English body uses `discount_code` and the French body uses `shipping_date`, both appear here. A send requires values only for the caller parameters referenced by its resolved language. Preview each language to see its inputs. In the version list, a published version reports only its own inputs, not those of sections it links from reusable blocks; the single-version read includes them. Extra parameters are ignored; omitting a caller parameter referenced by the resolved language returns a `422` naming it.\n",
     },
     default_language: {
       $ref: "#/components/schemas/LanguageTag",
@@ -43385,7 +44320,13 @@ export const EmailTemplateLanguageSchema = {
   additionalProperties: false,
   description:
     "One language of a template version: its content plus the identity a concurrent-edit check needs. Reading a language returns everything you need to edit it and save it back.\n",
-  required: ["language", "revision", "compatibility", "compatibility_severity"],
+  required: [
+    "language",
+    "revision",
+    "authoring_mode",
+    "compatibility",
+    "compatibility_severity",
+  ],
   properties: {
     language: {
       $ref: "#/components/schemas/LanguageTag",
@@ -43399,6 +44340,12 @@ export const EmailTemplateLanguageSchema = {
       readOnly: true,
       description:
         "This language's revision counter. Send it back when you save this language so a concurrent edit is caught instead of silently overwritten. It counts only this language's own changes, so editing another language never invalidates it.\n",
+    },
+    authoring_mode: {
+      readOnly: true,
+      $ref: "#/components/schemas/EmailAuthoringMode",
+      description:
+        "How this language is edited, derived from what it stores. `visual`: it keeps a document from the Bird dashboard's visual editor. A request that would add, move or remove its linked blocks is refused, and so is one that would replace its body while it links blocks; open the template's `editor_url` instead. Subject and preview text stay editable. While it links no blocks, a full save without `editor_state` replaces its visual design with your HTML, and a partial update that changes `html` or `text` keeps the design, so the language stays `visual` and the visual editor still shows the design rather than your HTML. `html`: it is edited as HTML, and blocks are linked with HTML comment markers of the form `bird:shared-block:OCCURRENCE_UUID` and `shared_blocks`. It changes only when a save keeps or drops the visual editor's document.\n",
     },
     content_hash: {
       type: ["string", "null"],
@@ -43433,6 +44380,48 @@ export const EmailTemplateLanguageSchema = {
         "What the stored HTML uses that mail clients remove, ignore, or render inconsistently, in the order the patterns appear. Empty when nothing is worth reporting. Line and column count in the `content.html` this response carries. At most 200 findings come back, the first 200 in source order; `compatibility_severity` is derived from every finding the HTML produced, including any beyond those 200.\n",
     },
   },
+  example: {
+    language: "en",
+    revision: 3,
+    authoring_mode: "html",
+    content_hash:
+      "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    updated_at: "2026-05-25T16:42:01Z",
+    content: {
+      subject: "Welcome to Acme, {{ bird.contact.first_name }}!",
+      preview_text: "{{ bird.contact.first_name }}, your order is on its way",
+      html: '<div style="display: flex;"><h1>Hi {{ bird.contact.first_name }}</h1></div>',
+    },
+    compatibility_severity: "warning",
+    compatibility: [
+      {
+        rule_id: "css_display_flex_grid",
+        severity: "warning",
+        language: null,
+        field: "html",
+        message:
+          "`display: flex` and `grid` don't work in Outlook (Windows/Windows Mail).",
+        fix: "Use tables for layout.",
+        partial:
+          "Partial support for `display: flex` and `grid` in Gmail (iOS/Android).",
+        line: 1,
+        column: 13,
+        match: "display: flex",
+        unsupported_clients: [
+          {
+            family: "outlook",
+            platforms: ["windows", "windows_mail"],
+          },
+        ],
+        partial_clients: [
+          {
+            family: "gmail",
+            platforms: ["ios", "android"],
+          },
+        ],
+      },
+    ],
+  },
 } as const;
 
 export const EmailTemplateLanguageUpsertSchema = {
@@ -43442,6 +44431,20 @@ export const EmailTemplateLanguageUpsertSchema = {
     "Content to save for one language, replacing whatever that language held. Send every field you want the language to keep: a field you omit is cleared, which is what makes saving the same content twice land the same way every time.\n",
   required: ["subject"],
   properties: {
+    shared_blocks: {
+      description:
+        "Links reusable blocks into this language. Send the complete language with it: `html` with one HTML comment `bird:shared-block:OCCURRENCE_UUID` per binding, placed where a section can stand (between block-level elements, not inside a paragraph or a table row), empty `text`, and the `revision` you read (0 to create the language). Key each binding by a lowercase UUID for that occurrence. A newly linked block must be unarchived and published in this exact language. Keep an occurrence's UUID to move it, use a new one to add another, and delete both its marker and its binding to remove it. To remove every link, send HTML without markers and empty `bindings`. A language edited in the Bird dashboard's visual editor cannot be saved this way from outside the dashboard (`E04108`).\n",
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateSharedBlocks",
+        },
+      ],
+    },
+    replace_custom_text: {
+      type: "boolean",
+      description:
+        "Confirms replacing the language's custom plain-text body with text derived from the linked HTML, in the same save that links its first block. Requires `shared_blocks` and the language `revision`.\n",
+    },
     subject: {
       type: "string",
       minLength: 0,
@@ -43460,7 +44463,8 @@ export const EmailTemplateLanguageUpsertSchema = {
     html: {
       type: "string",
       maxLength: 524288,
-      description: "The HTML body for this language.",
+      description:
+        "The HTML body for this language. On a language that links blocks, a save without `shared_blocks` is refused (`E04109`); read it with `authoring=true` for the HTML with its block markers first.\n",
       example: "<h1>Hi {{ bird.contact.first_name }}</h1>",
     },
     text: {
@@ -43475,6 +44479,11 @@ export const EmailTemplateLanguageUpsertSchema = {
       description:
         "The revision you last read for this language, to detect a concurrent edit. The save is rejected with a conflict if the language moved on since. Omit it to save unconditionally. Creating a language does not need one.\n",
     },
+  },
+  example: {
+    subject: "Welcome to Acme, {{ bird.contact.first_name }}!",
+    preview_text: "{{ bird.contact.first_name }}, your order is on its way",
+    html: "<h1>Hi {{ bird.contact.first_name }}</h1>",
   },
 } as const;
 
@@ -43495,6 +44504,7 @@ export const EmailTemplateLanguageSavedSchema = {
   required: [
     "language",
     "revision",
+    "authoring_mode",
     "draft_revision",
     "template_ref",
     "version_id",
@@ -43502,6 +44512,14 @@ export const EmailTemplateLanguageSavedSchema = {
     "compatibility_severity",
   ],
   properties: {
+    shared_blocks: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateSharedBlocks",
+        },
+      ],
+    },
     language: {
       $ref: "#/components/schemas/LanguageTag",
       readOnly: true,
@@ -43514,6 +44532,12 @@ export const EmailTemplateLanguageSavedSchema = {
       readOnly: true,
       description:
         "This language's new revision. Send it back on your next save of this language so a concurrent edit is caught instead of silently overwritten.\n",
+    },
+    authoring_mode: {
+      readOnly: true,
+      $ref: "#/components/schemas/EmailAuthoringMode",
+      description:
+        "How this language is edited, derived from what it stores. `visual`: it keeps a document from the Bird dashboard's visual editor. A request that would add, move or remove its linked blocks is refused, and so is one that would replace its body while it links blocks; open the template's `editor_url` instead. Subject and preview text stay editable. While it links no blocks, a full save without `editor_state` replaces its visual design with your HTML, and a partial update that changes `html` or `text` keeps the design, so the language stays `visual` and the visual editor still shows the design rather than your HTML. `html`: it is edited as HTML, and blocks are linked with HTML comment markers of the form `bird:shared-block:OCCURRENCE_UUID` and `shared_blocks`. It changes only when a save keeps or drops the visual editor's document.\n",
     },
     draft_revision: {
       type: "integer",
@@ -43570,6 +44594,19 @@ export const EmailTemplateLanguageSavedSchema = {
         "What the HTML you just saved uses that mail clients remove, ignore, or render inconsistently, in the order the patterns appear. Empty when nothing is worth reporting. Advisory: the language was saved either way, and a finding never refuses a write. Line and column count in the HTML as saved, which the language read returns as `content.html`. A partial update reports on the language in full rather than on the fields it carried, so it reads the same as the read of the same language. At most 200 findings come back, the first 200 in source order; `compatibility_severity` is derived from every finding the HTML produced, including any beyond those 200.\n",
     },
   },
+  example: {
+    language: "en",
+    revision: 4,
+    authoring_mode: "html",
+    draft_revision: 12,
+    content_hash:
+      "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    updated_at: "2026-05-25T16:42:01Z",
+    template_ref: "emt_01krdgeqcxet5s7t44vh8rt9mg",
+    version_id: "emv_01krdgeqcxet5s7t44vh8rt9mg",
+    compatibility_severity: "none",
+    compatibility: [],
+  },
 } as const;
 
 export const EmailTemplateLanguageUpdateSchema = {
@@ -43596,14 +44633,15 @@ export const EmailTemplateLanguageUpdateSchema = {
     html: {
       type: "string",
       maxLength: 524288,
-      description: "A new HTML body for this language.",
+      description:
+        "A new HTML body for this language. Refused on a language that links blocks; change its body with a full save that includes `shared_blocks`.\n",
       example: "<h1>Hi {{ bird.contact.first_name }}</h1>",
     },
     text: {
       type: ["string", "null"],
       maxLength: 524288,
       description:
-        "A new plain-text body for this language. Send null to clear it, and a plain-text alternative is derived from the HTML when you submit.\n",
+        "A new plain-text body for this language. Send null to clear it, and a plain-text alternative is derived from the HTML when you submit. Refused on a language that links blocks, which always derives its text.\n",
     },
     revision: {
       type: "integer",
@@ -47818,13 +48856,13 @@ export const EventEmailBaseSchema = {
         $ref: "#/components/schemas/Tag",
       },
       description:
-        "Tags provided on the send request, echoed on every event for the send so you can route and correlate without an extra lookup. Null when the send carried no tags.\n",
+        "Tags from the send request when available. Null when no tags were supplied. On email.unsubscribed and email.list_unsubscribed from Bird unsubscribe links, null for individual sends and when broadcast context is unavailable. Correlate using workspace_id and email_id even when tags are null.\n",
     },
     metadata: {
       type: ["object", "null"],
       additionalProperties: true,
       description:
-        "The metadata object provided on the send request, echoed on every event for the send so you can correlate events with your own records. Null when the send carried no metadata.\n",
+        "Metadata from the send request when available. Null when no metadata was supplied. On email.unsubscribed and email.list_unsubscribed from Bird unsubscribe links, null for individual sends and when broadcast context is unavailable. Keep a mapping from workspace_id and email_id to your own records for correlation.\n",
       example: {
         order_id: "ord_123",
       },
@@ -53772,13 +54810,13 @@ export const NumbersOrderSchema = {
           $ref: "#/components/schemas/NumbersOrderID",
         },
       ],
-      description: "Identifier of this purchase order.",
+      description: "Identifier of this number order.",
     },
     number: {
-      type: "string",
-      minLength: 1,
       readOnly: true,
       description: "The number being acquired, in E.164 format.",
+      type: "string",
+      minLength: 1,
     },
     country_code: {
       allOf: [
@@ -53808,7 +54846,7 @@ export const NumbersOrderSchema = {
     number_id: {
       readOnly: true,
       description:
-        "Identifier of the number this order produced, set when `status` is `completed`. Pass it as `number_id` to `GET /v1/numbers/{number_id}` or `DELETE /v1/numbers/{number_id}`. `null` until the order completes.\n",
+        "Identifier of the workspace allocation associated with this completed order. Multiple orders can refer to the same allocation. This historical association remains after release; `GET /v1/numbers/{number_id}` returns its current holding state and can return not found after release. `null` until the order completes.\n",
       oneOf: [
         {
           $ref: "#/components/schemas/NumbersDedicatedAllocationID",
@@ -53829,7 +54867,7 @@ export const NumbersOrderSchema = {
       format: "date-time",
       readOnly: true,
       description:
-        "When the purchase completed and the number became owned (status completed). `null` for orders still in progress or failed.\n",
+        "When this order completed (status completed). Completion records the associated allocation and does not establish its current holding state. `null` for orders still in progress or failed.\n",
     },
     created_at: {
       type: "string",
@@ -53903,7 +54941,6 @@ export const NumbersOrderComplianceSchema = {
 export const NumbersOrderCreateSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["number"],
   properties: {
     number: {
       type: "string",
@@ -53924,6 +54961,7 @@ export const NumbersOrderCreateSchema = {
       $ref: "#/components/schemas/NumbersOrderCompliance",
     },
   },
+  required: ["number"],
 } as const;
 
 export const NumberUpdateSchema = {
@@ -54366,7 +55404,7 @@ export const VoiceTrunkCoreSchema = {
       readOnly: true,
       minItems: 1,
       description:
-        'The Digest hash algorithms this trunk offers, in the order they are offered. We send one challenge line per algorithm and your PBX answers with the first it supports, so the order decides what most equipment picks. Always populated: a trunk with no explicit setting reports the default, `["SHA-256", "MD5"]`. A trunk answering with an algorithm that is not on this list is rejected, so narrowing the list also narrows what the trunk accepts. Replace `digest_algorithms` through the trunk update operation.\n',
+        'The Digest hash algorithms this trunk offers, in the order they are offered. We send one challenge line per algorithm and your PBX answers with the first it supports, so the order decides what most equipment picks. Always populated: a trunk with no explicit setting reports the default, `["SHA-256", "MD5"]`. The list governs clients that authenticate with an API key: their answer with an algorithm that is not on it is rejected, so narrowing the list also narrows what the trunk accepts from them. Session credentials, which the dashboard phone uses and `POST /v1/voice/session-credentials` creates, are the exception: with `session_credentials_enabled`, the challenge always ends with an MD5 line, after the list in its own order, and a valid session credential is accepted with MD5 or SHA-256. An API-key answer with that extra MD5 is still rejected. Replace `digest_algorithms` through the trunk update operation.\n',
       items: {
         $ref: "#/components/schemas/VoiceSIPDigestAlgorithm",
       },
@@ -54390,15 +55428,33 @@ export const VoiceTrunkMediaEncryptionSchema = {
   example: "preferred",
 } as const;
 
+export const VoiceTrunkMediaSiteSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["ap1", "eu1", "us1"],
+  description: "A Bird media site.",
+} as const;
+
 export const VoiceTrunkMediaSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["encryption"],
+  required: ["encryption", "sites"],
   description:
     "How the trunk carries call audio. Set it through the trunk update operation.",
   properties: {
     encryption: {
       $ref: "#/components/schemas/VoiceTrunkMediaEncryption",
+    },
+    sites: {
+      type: "array",
+      minItems: 1,
+      uniqueItems: true,
+      example: ["ap1", "eu1", "us1"],
+      items: {
+        $ref: "#/components/schemas/VoiceTrunkMediaSite",
+      },
+      description:
+        "The sites the trunk-facing leg may use for call audio. The trunk's home site is always included. Carrier availability can further limit those sites; a separate carrier-facing leg may use another site. A trunk whose media sites aren't set reports its home site; until they're saved, Bird may also anchor audio at an exit gateway's or a bridged call's site.\n",
     },
   },
 } as const;
@@ -54460,6 +55516,17 @@ export const VoiceTrunkMediaCreateSchema = {
       description:
         "Omit it for `preferred`, which encrypts whenever your equipment and gateways allow and otherwise carries calls as before.\n",
     },
+    sites: {
+      type: "array",
+      minItems: 1,
+      uniqueItems: true,
+      example: ["ap1", "eu1", "us1"],
+      items: {
+        $ref: "#/components/schemas/VoiceTrunkMediaSite",
+      },
+      description:
+        "The sites this trunk may use for call audio, including its home site. Omit this field to allow every media site.\n",
+    },
   },
 } as const;
 
@@ -54503,7 +55570,7 @@ export const VoiceTrunkCreateSchema = {
       type: "array",
       minItems: 1,
       description:
-        'The Digest hash algorithms to offer, in the order they should be offered. Omit this to use the default of `["SHA-256", "MD5"]`, which suits most equipment. Send `["MD5"]` for a PBX that only implements MD5 and rejects or ignores a challenge offering SHA-256 first. This can be changed later without re-issuing credentials.\n',
+        'The Digest hash algorithms to offer, in the order they should be offered. Omit this to use the default of `["SHA-256", "MD5"]`, which suits most equipment. Send `["MD5"]` for a PBX that only implements MD5 and rejects or ignores a challenge offering SHA-256 first. This governs clients that authenticate with an API key. Session credentials, including the dashboard phone\'s, are always offered MD5 as well and accepted with MD5 or SHA-256. This can be changed later without re-issuing credentials.\n',
       items: {
         $ref: "#/components/schemas/VoiceSIPDigestAlgorithm",
       },
@@ -54523,11 +55590,21 @@ export const VoiceTrunkMediaUpdateSchema = {
   type: "object",
   additionalProperties: false,
   minProperties: 1,
-  required: ["encryption"],
-  description: "A change to how the trunk encrypts call audio.",
+  description: "A change to how the trunk carries call audio.",
   properties: {
     encryption: {
       $ref: "#/components/schemas/VoiceTrunkMediaEncryption",
+    },
+    sites: {
+      type: "array",
+      minItems: 1,
+      uniqueItems: true,
+      example: ["ap1", "eu1", "us1"],
+      items: {
+        $ref: "#/components/schemas/VoiceTrunkMediaSite",
+      },
+      description:
+        "Replace the permitted media sites. The list must include the trunk's home site. Omit this field to keep the current sites.\n",
     },
   },
 } as const;
@@ -54607,7 +55684,7 @@ export const VoiceTrunkUpdateSchema = {
     digest_algorithms: {
       type: "array",
       description:
-        'Replaces the Digest hash algorithms this trunk offers, in the order they should be offered. Send `["MD5"]` for a PBX that only implements MD5 and rejects or ignores a challenge offering SHA-256 first. Send an empty array to return to the default of `["SHA-256", "MD5"]`. The offer is never empty, because a trunk that offered nothing could not be authenticated at all. Narrowing the list also narrows what the trunk accepts: an answer using an algorithm no longer offered is rejected. Takes effect on the next call setup; no credential is re-issued. Omit the field to leave the offer unchanged.\n',
+        'Replaces the Digest hash algorithms this trunk offers, in the order they should be offered. Send `["MD5"]` for a PBX that only implements MD5 and rejects or ignores a challenge offering SHA-256 first. Send an empty array to return to the default of `["SHA-256", "MD5"]`. The offer is never empty, because a trunk that offered nothing could not be authenticated at all. The list governs clients that authenticate with an API key, and narrowing it also narrows what the trunk accepts from them: an answer using an algorithm no longer offered is rejected. Session credentials, including the dashboard phone\'s, are always offered MD5 as well and accepted with MD5 or SHA-256. Takes effect on the next call setup; no credential is re-issued. Omit the field to leave the offer unchanged.\n',
       items: {
         $ref: "#/components/schemas/VoiceSIPDigestAlgorithm",
       },
@@ -61893,6 +62970,18 @@ export const EmailBroadcastWritableSchema = {
   additionalProperties: false,
   required: ["category", "track_opens", "track_clicks"],
   properties: {
+    automatic_seeding: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailBroadcastAutomaticSeeding",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The broadcast's automatic seeding choice, or null when a seed test starts only from a contact at the workspace's trigger address in the audience. Returned on single-broadcast reads and on create and update responses to callers with Inbox Insights read and contact read permission. Not included in lists.\n",
+    },
     from: {
       $ref: "#/components/schemas/EmailAddress",
       description:
@@ -67839,6 +68928,393 @@ export const EmailCompetitiveVolumeSeriesWritableSchema = {
     "Volume over time for the requested watched brands, plus your own sending, on one shared daily axis.\n",
 } as const;
 
+export const EmailBlockWritableSchema = {
+  readOnly: true,
+  description:
+    "A reusable email section with independently editable languages.",
+  allOf: [
+    {
+      type: "object",
+      required: ["id", "name", "source_language", "revision", "created_by"],
+      properties: {
+        id: {
+          $ref: "#/components/schemas/EmailBlockID",
+        },
+        name: {
+          type: "string",
+          description:
+            "Name for people choosing the block, such as when linking it into a template.",
+          minLength: 1,
+          maxLength: 100,
+          example: "Legal disclosure",
+        },
+        description: {
+          type: "string",
+          maxLength: 2000,
+          description:
+            "Optional notes for people maintaining the block. Omitted when empty.",
+        },
+        source_language: {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        revision: {
+          type: "integer",
+          format: "int64",
+          minimum: 1,
+          description:
+            "Metadata revision to send when editing or duplicating this block.",
+          example: 1,
+        },
+        created_by: {
+          $ref: "#/components/schemas/ActorWritable",
+          description:
+            "Who created the block. A duplicate is created by whoever duplicated it.",
+        },
+        archived_at: {
+          type: "string",
+          format: "date-time",
+          description:
+            "Present when the block is archived. Retained published content remains readable.",
+        },
+      },
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const EmailBlockListWritableSchema = {
+  description: "A page of blocks.",
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/EmailBlockWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const EmailBlockSubmissionLanguageWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description: "One language included in a block change.",
+  required: ["language", "draft_revision", "candidate_revision_id"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+    },
+    draft_revision: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description: "Draft revision this snapshot was taken from.",
+      example: 8,
+    },
+    candidate_revision_id: {
+      $ref: "#/components/schemas/EmailBlockRevisionID",
+      description: "Immutable snapshot of the draft at that revision.",
+    },
+  },
+} as const;
+
+export const EmailBlockPublishedRevisionWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "A revision that became the published content of one block language.",
+  required: ["language", "id", "version_number"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+    },
+    id: {
+      $ref: "#/components/schemas/EmailBlockRevisionID",
+    },
+    version_number: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description: "Publication number within this block language.",
+      example: 3,
+    },
+  },
+} as const;
+
+export const EmailBlockSubmissionWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "One block change put forward for publication. A change that needs no review is recorded already published.",
+  required: [
+    "id",
+    "block_id",
+    "status",
+    "languages",
+    "published_revisions",
+    "published_at",
+    "created_at",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/EmailBlockSubmissionID",
+    },
+    block_id: {
+      $ref: "#/components/schemas/EmailBlockID",
+    },
+    status: {
+      $ref: "#/components/schemas/EmailBlockSubmissionStatus",
+    },
+    languages: {
+      type: "array",
+      description:
+        "Each included language, the draft revision it was taken from, and the snapshot frozen for it.",
+      items: {
+        $ref: "#/components/schemas/EmailBlockSubmissionLanguageWritable",
+      },
+    },
+    published_revisions: {
+      type: "array",
+      description:
+        "The revisions that became live when this change was published.",
+      items: {
+        $ref: "#/components/schemas/EmailBlockPublishedRevisionWritable",
+      },
+    },
+    published_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      example: "2026-05-25T16:42:01Z",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      example: "2026-05-25T16:42:01Z",
+    },
+  },
+} as const;
+
+export const EmailBlockLanguageFieldsWritableSchema = {
+  type: "object",
+  required: ["language", "revision"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+    },
+    revision: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description:
+        "Draft revision to send back when saving or publishing this language, as last returned. It is not a publication number; a published revision is a separate record numbered by `version_number`.",
+      example: 1,
+    },
+    source_revision_id: {
+      $ref: "#/components/schemas/EmailBlockRevisionID",
+      description:
+        "Published source-language revision used for this translation. Omitted when untracked.",
+    },
+    published_revision_id: {
+      $ref: "#/components/schemas/EmailBlockRevisionID",
+      description:
+        "Current published revision for this exact language. Omitted before publication.",
+    },
+  },
+} as const;
+
+export const EmailBlockLanguageSummaryWritableSchema = {
+  readOnly: true,
+  description:
+    "One language's draft revision and publication references, without its content.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailBlockLanguageFieldsWritable",
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const EmailBlockLanguageListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "All block languages, ordered by language tag. A block holds at most 25 languages.",
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      maxItems: 25,
+      items: {
+        $ref: "#/components/schemas/EmailBlockLanguageSummaryWritable",
+      },
+    },
+  },
+} as const;
+
+export const EmailBlockLanguageWritableSchema = {
+  readOnly: true,
+  description:
+    "Editable content for one exact language. No language fallback is applied.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailBlockLanguageFieldsWritable",
+    },
+    {
+      type: "object",
+      required: ["fragment"],
+      properties: {
+        fragment: {
+          $ref: "#/components/schemas/EmailBlockFragment",
+        },
+      },
+    },
+  ],
+  unevaluatedProperties: false,
+  example: {
+    language: "en",
+    revision: 2,
+    authoring_mode: "html",
+    published_revision_id: "ebr_01krdgeqcxet5s7t44vh8rt9mg",
+    fragment: {
+      serializer_version: 2,
+      fragment_html:
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tbody><tr><td lang="en" style="font-family: Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: normal; line-height: 20px; letter-spacing: normal; text-align: left; text-transform: none; color: #333333; margin: 0; padding: 16px;"><p style="margin: 0;">Your disclosure text.</p></td></tr></tbody></table>',
+    },
+    created_at: "2026-05-20T09:14:52Z",
+    updated_at: "2026-05-25T16:42:01Z",
+  },
+} as const;
+
+export const EmailBlockRevisionFieldsWritableSchema = {
+  type: "object",
+  readOnly: true,
+  required: [
+    "id",
+    "version_number",
+    "serializer_version",
+    "published_by",
+    "published_at",
+    "created_at",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/EmailBlockRevisionID",
+    },
+    version_number: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description:
+        "Publication number within this block language. A draft's `revision` is the value to send back when saving, not a publication number.",
+      example: 1,
+    },
+    serializer_version: {
+      type: "integer",
+      minimum: 1,
+      description:
+        "Format used to save and render this section: 2 for a section written as HTML, 1 for one built in the Bird dashboard's visual editor.",
+      example: 2,
+    },
+    source_revision_id: {
+      $ref: "#/components/schemas/EmailBlockRevisionID",
+      description:
+        "Source-language revision used for this translation. Omitted when untracked.",
+    },
+    published_by: {
+      $ref: "#/components/schemas/ActorWritable",
+      description: "Who published this revision.",
+    },
+    published_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      example: "2026-05-25T16:42:01Z",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      example: "2026-05-25T16:42:01Z",
+    },
+  },
+} as const;
+
+export const EmailBlockRevisionSummaryWritableSchema = {
+  readOnly: true,
+  description: "A retained publication without its content.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailBlockRevisionFieldsWritable",
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const EmailBlockRevisionListWritableSchema = {
+  description: "A page of published block revisions.",
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/EmailBlockRevisionSummaryWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const EmailBlockRevisionWritableSchema = {
+  readOnly: true,
+  description: "Retained published content for one exact block language.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailBlockRevisionFieldsWritable",
+    },
+  ],
+  unevaluatedProperties: false,
+  example: {
+    id: "ebr_01krdgeqcxet5s7t44vh8rt9mg",
+    version_number: 1,
+    serializer_version: 2,
+    authoring_mode: "html",
+    published_by: {
+      id: "key_01krdgeqcxet5s7t44vh8rt9mg",
+      type: "api_key",
+      display_name: "Release pipeline",
+    },
+    fragment: {
+      serializer_version: 2,
+      fragment_html:
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tbody><tr><td lang="en" style="font-family: Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: normal; line-height: 20px; letter-spacing: normal; text-align: left; text-transform: none; color: #333333; margin: 0; padding: 16px;"><p style="margin: 0;">Your disclosure text.</p></td></tr></tbody></table>',
+    },
+    published_at: "2026-05-25T16:42:01Z",
+    created_at: "2026-05-25T16:42:01Z",
+  },
+} as const;
+
 export const EmailTemplateLanguageStateWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -67892,6 +69368,126 @@ export const EmailTemplateListWritableSchema = {
       $ref: "#/components/schemas/_ListEnvelope",
     },
   ],
+} as const;
+
+export const EmailTemplateLanguageContentWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One language's content for an email template. Each language carries its own subject, preview text and bodies, so a translation can differ in wording and length from every other language without affecting them.\n",
+  properties: {
+    subject: {
+      type: "string",
+      maxLength: 998,
+      description: "The email subject line for this language.",
+      example: "Welcome to Acme, {{ bird.contact.first_name }}!",
+    },
+    preview_text: {
+      type: "string",
+      maxLength: 255,
+      description:
+        "The line an inbox shows after the subject in the message list, for this language. Leave it out and the inbox shows the opening words of the body instead. A mail client only reads it from the message body, so publishing folds it into the top of the HTML, hidden from view once the message is open; write it here rather than hiding your own copy in the body.\n",
+      example: "{{ bird.contact.first_name }}, your order is on its way",
+    },
+    html: {
+      type: "string",
+      maxLength: 524288,
+      description: "The HTML body for this language.",
+      example: "<h1>Hi {{ bird.contact.first_name }}</h1>",
+    },
+    text: {
+      type: "string",
+      maxLength: 524288,
+      description:
+        "The plain-text body for this language. Omit it and a plain-text alternative is derived from the HTML when you submit.\n",
+    },
+  },
+} as const;
+
+export const EmailTemplateCreateWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Parameters for creating an email template and its initial draft.",
+  required: ["slug", "category", "source"],
+  properties: {
+    slug: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateSlug",
+        },
+      ],
+      description:
+        "The template's workspace-unique handle, and a stable alternative to the template ID when sending by template. It can contain lowercase letters, numbers, hyphens, and underscores. It is fixed at creation, so pick it deliberately. Two prefixes are rejected: `bird_`, reserved for our built-in templates, and `emt_`, the template ID format, which a slug could never be distinguished from.\n",
+      example: "welcome-email",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "The template's display name, shown wherever the template is listed. You can change it any time. It defaults to the slug if you do not set one.\n",
+      example: "Welcome email",
+    },
+    description: {
+      type: "string",
+      description: "What the template is for, in your own words.",
+      example: "Sent to new customers after signup.",
+    },
+    category: {
+      $ref: "#/components/schemas/EmailTemplateCategory",
+    },
+    source: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateSourceWrite",
+        },
+      ],
+      description:
+        "The authoring format the template is written in, fixed at creation.\n`html` is finished markup you provide, optionally personalized with\nLiquid. Liquid supports variables, filters, and control flow such\nas `{% if %}` conditionals and `{% for %}` loops. A few constructs are\nrejected when you submit, and the error names exactly what to change:\n\n- Partial includes (`{% include %}`, `{% render %}`).\n- The `increment`, `decrement`, and `ifchanged` tags.\n- The `money`, `format_date`, `format_time`, `json`, `inspect`, and `type` filters.\n- Comparing against `empty`/`blank` (use `.size == 0` instead).\n- Blocks nested far deeper than real email markup needs.\n\nBroadcast template parameters accept scalar values; arrays and objects are unsupported.\nBroadcasts support `{% for %}` over a local collection created with `split`.\nBroadcasts without caller-supplied parameters also support literal ranges and\n`{% tablerow %}`. When a broadcast uses caller parameters, ranges and\n`{% tablerow %}` are unsupported.\n",
+    },
+    languages: {
+      type: "object",
+      maxProperties: 25,
+      propertyNames: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/EmailTemplateLanguageContentWritable",
+      },
+      description:
+        "The initial draft's content, keyed by language tag in BCP-47 form such as\n`en` or `pt-BR`. A template holds up to 25 languages, and a send picks one\nof them.\n\nOmit this to create an empty draft and add content later.\n\nThe example's `{{ first_name }}` is a parameter, filled from\n`template.parameters` at send time. A `{{ bird.contact.<attribute> }}`\nplaceholder reads a contact attribute. Broadcasts resolve each audience\ncontact during preparation; previews use the selected contact or sample\nvalues. Missing attributes use their configured fallbacks, while explicit\nempty strings remain empty.\n\nPublic API sends, including batch and scheduled sends, look up each To\naddress in this workspace when the selected language reads contact\nattributes. A missing contact returns `422` (`E04099`), even if Liquid\nsupplies a default. Each To receives its own personalized email, with Cc\nand Bcc copied on each. Resolved values are saved at acceptance for\ndelivery and later content reads.\n",
+      example: {
+        en: {
+          subject: "Welcome, {{ first_name }}",
+          preview_text: "Your account is ready",
+          html: "<!DOCTYPE html>\n<html>\n<body>\n<p>Hi {{ first_name }}, thanks for signing up.</p>\n</body>\n</html>\n",
+        },
+      },
+    },
+    default_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      example: "en",
+      description:
+        "The language a send uses when it does not name one, and the last resort when a requested language is not available. It has to be one of the languages you supply. If you leave it out, we default to `en`, unless you supply exactly one language, in which case we use that one instead. So if you supply two or more languages and `en` is not among them, you have to set this yourself.\n",
+    },
+    on_missing_language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateOnMissingLanguage",
+        },
+      ],
+      default: "fallback",
+      description:
+        "What a send does when it asks for a language this template does not carry. Defaults to `fallback` on email.\n",
+    },
+    language_source_required: {
+      type: "boolean",
+      default: false,
+      description:
+        "Whether a send has to name a language. Set it to true to reject a send that names none instead of serving the default language. Pair it with `on_missing_language: fail` when every send must pick a language deliberately: on its own, `fail` is bypassed by naming no language at all. A broadcast must select a template language when this is set. Defaults to false.\n",
+    },
+  },
 } as const;
 
 export const EmailTemplateWritableSchema = {
@@ -67994,8 +69590,50 @@ export const EmailTemplateLanguageWritableSchema = {
     "One language of a template version: its content plus the identity a concurrent-edit check needs. Reading a language returns everything you need to edit it and save it back.\n",
   properties: {
     content: {
-      $ref: "#/components/schemas/EmailTemplateLanguageContent",
+      $ref: "#/components/schemas/EmailTemplateLanguageContentWritable",
     },
+  },
+  example: {
+    language: "en",
+    revision: 3,
+    authoring_mode: "html",
+    content_hash:
+      "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    updated_at: "2026-05-25T16:42:01Z",
+    content: {
+      subject: "Welcome to Acme, {{ bird.contact.first_name }}!",
+      preview_text: "{{ bird.contact.first_name }}, your order is on its way",
+      html: '<div style="display: flex;"><h1>Hi {{ bird.contact.first_name }}</h1></div>',
+    },
+    compatibility_severity: "warning",
+    compatibility: [
+      {
+        rule_id: "css_display_flex_grid",
+        severity: "warning",
+        language: null,
+        field: "html",
+        message:
+          "`display: flex` and `grid` don't work in Outlook (Windows/Windows Mail).",
+        fix: "Use tables for layout.",
+        partial:
+          "Partial support for `display: flex` and `grid` in Gmail (iOS/Android).",
+        line: 1,
+        column: 13,
+        match: "display: flex",
+        unsupported_clients: [
+          {
+            family: "outlook",
+            platforms: ["windows", "windows_mail"],
+          },
+        ],
+        partial_clients: [
+          {
+            family: "gmail",
+            platforms: ["ios", "android"],
+          },
+        ],
+      },
+    ],
   },
 } as const;
 
@@ -68004,6 +69642,19 @@ export const EmailTemplateLanguageSavedWritableSchema = {
   additionalProperties: false,
   description:
     "The identity, revision counters, and fingerprint of a saved language. The response does not include its content; read the language to retrieve it.\n",
+  example: {
+    language: "en",
+    revision: 4,
+    authoring_mode: "html",
+    draft_revision: 12,
+    content_hash:
+      "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    updated_at: "2026-05-25T16:42:01Z",
+    template_ref: "emt_01krdgeqcxet5s7t44vh8rt9mg",
+    version_id: "emv_01krdgeqcxet5s7t44vh8rt9mg",
+    compatibility_severity: "none",
+    compatibility: [],
+  },
 } as const;
 
 export const EmailTemplateSubmitResultWritableSchema = {
@@ -69610,13 +71261,13 @@ export const EventEmailBaseWritableSchema = {
         $ref: "#/components/schemas/Tag",
       },
       description:
-        "Tags provided on the send request, echoed on every event for the send so you can route and correlate without an extra lookup. Null when the send carried no tags.\n",
+        "Tags from the send request when available. Null when no tags were supplied. On email.unsubscribed and email.list_unsubscribed from Bird unsubscribe links, null for individual sends and when broadcast context is unavailable. Correlate using workspace_id and email_id even when tags are null.\n",
     },
     metadata: {
       type: ["object", "null"],
       additionalProperties: true,
       description:
-        "The metadata object provided on the send request, echoed on every event for the send so you can correlate events with your own records. Null when the send carried no metadata.\n",
+        "Metadata from the send request when available. Null when no metadata was supplied. On email.unsubscribed and email.list_unsubscribed from Bird unsubscribe links, null for individual sends and when broadcast context is unavailable. Keep a mapping from workspace_id and email_id to your own records for correlation.\n",
       example: {
         order_id: "ord_123",
       },

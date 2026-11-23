@@ -97,6 +97,9 @@ import type {
   CreateDomainData,
   CreateDomainErrors,
   CreateDomainResponses,
+  CreateEmailBlockData,
+  CreateEmailBlockErrors,
+  CreateEmailBlockResponses,
   CreateEmailBroadcastData,
   CreateEmailBroadcastErrors,
   CreateEmailBroadcastResponses,
@@ -280,6 +283,9 @@ import type {
   DeleteDomainData,
   DeleteDomainErrors,
   DeleteDomainResponses,
+  DeleteEmailBlockLanguageData,
+  DeleteEmailBlockLanguageErrors,
+  DeleteEmailBlockLanguageResponses,
   DeleteEmailBroadcastData,
   DeleteEmailBroadcastErrors,
   DeleteEmailBroadcastResponses,
@@ -382,6 +388,9 @@ import type {
   DisconnectRealtimeAppMemberData,
   DisconnectRealtimeAppMemberErrors,
   DisconnectRealtimeAppMemberResponses,
+  DuplicateEmailBlockData,
+  DuplicateEmailBlockErrors,
+  DuplicateEmailBlockResponses,
   DuplicateEmailTemplateData,
   DuplicateEmailTemplateErrors,
   DuplicateEmailTemplateResponses,
@@ -523,6 +532,15 @@ import type {
   GetDomainData,
   GetDomainErrors,
   GetDomainResponses,
+  GetEmailBlockData,
+  GetEmailBlockErrors,
+  GetEmailBlockLanguageData,
+  GetEmailBlockLanguageErrors,
+  GetEmailBlockLanguageResponses,
+  GetEmailBlockResponses,
+  GetEmailBlockRevisionData,
+  GetEmailBlockRevisionErrors,
+  GetEmailBlockRevisionResponses,
   GetEmailBroadcastCountsData,
   GetEmailBroadcastCountsErrors,
   GetEmailBroadcastCountsResponses,
@@ -1009,6 +1027,15 @@ import type {
   ListDomainsData,
   ListDomainsErrors,
   ListDomainsResponses,
+  ListEmailBlockLanguagesData,
+  ListEmailBlockLanguagesErrors,
+  ListEmailBlockLanguagesResponses,
+  ListEmailBlockRevisionsData,
+  ListEmailBlockRevisionsErrors,
+  ListEmailBlockRevisionsResponses,
+  ListEmailBlocksData,
+  ListEmailBlocksErrors,
+  ListEmailBlocksResponses,
   ListEmailBroadcastClickedLinksData,
   ListEmailBroadcastClickedLinksErrors,
   ListEmailBroadcastClickedLinksResponses,
@@ -1237,6 +1264,9 @@ import type {
   PublishAssetUploadSessionData,
   PublishAssetUploadSessionErrors,
   PublishAssetUploadSessionResponses,
+  PublishEmailBlockData,
+  PublishEmailBlockErrors,
+  PublishEmailBlockResponses,
   PublishRealtimeAppBatchData,
   PublishRealtimeAppBatchErrors,
   PublishRealtimeAppBatchResponses,
@@ -1360,6 +1390,9 @@ import type {
   UpdateDomainData,
   UpdateDomainErrors,
   UpdateDomainResponses,
+  UpdateEmailBlockData,
+  UpdateEmailBlockErrors,
+  UpdateEmailBlockResponses,
   UpdateEmailBroadcastData,
   UpdateEmailBroadcastErrors,
   UpdateEmailBroadcastResponses,
@@ -1435,6 +1468,9 @@ import type {
   UpdateWorkspaceNumberData,
   UpdateWorkspaceNumberErrors,
   UpdateWorkspaceNumberResponses,
+  UpsertEmailBlockLanguageData,
+  UpsertEmailBlockLanguageErrors,
+  UpsertEmailBlockLanguageResponses,
   UpsertEmailInboxInsightsDomainMonitoringData,
   UpsertEmailInboxInsightsDomainMonitoringErrors,
   UpsertEmailInboxInsightsDomainMonitoringResponses,
@@ -1447,6 +1483,9 @@ import type {
   UpsertWhatsAppTemplateLanguageData,
   UpsertWhatsAppTemplateLanguageErrors,
   UpsertWhatsAppTemplateLanguageResponses,
+  ValidateEmailBlockFragmentData,
+  ValidateEmailBlockFragmentErrors,
+  ValidateEmailBlockFragmentResponses,
   ValidateEmailBroadcastData,
   ValidateEmailBroadcastErrors,
   ValidateEmailBroadcastResponses,
@@ -2696,7 +2735,7 @@ export const listEmailBroadcastClickedLinks = <
 /**
  * Validate a broadcast
  *
- * Check the saved broadcast or the changes supplied in this request against the template's published content. This does not save changes, select a template version for sending or evaluate recipients. Requires template read permission in addition to broadcast read. Each call computes a fresh result. An Idempotency-Key header is accepted but does not replay an earlier result.
+ * Check the saved broadcast or the changes supplied in this request against the template's published content. This does not save changes, select a template version for sending or evaluate recipients. Requires template read permission in addition to broadcast read. Warnings about the broadcast's automatic seed test also need Inbox Insights read, and a result without them does not confirm that the seed test will run. Each call computes a fresh result. An Idempotency-Key header is accepted but does not replay an earlier result.
  */
 export const validateEmailBroadcast = <ThrowOnError extends boolean = false>(
   options: Options<ValidateEmailBroadcastData, ThrowOnError>,
@@ -2798,8 +2837,14 @@ export const sendEmailBroadcastTest = <ThrowOnError extends boolean = false>(
  * Sends a draft or scheduled broadcast, either immediately or at `scheduled_at`.
  * Calling this on a scheduled broadcast replaces its schedule or sends it now if
  * `scheduled_at` is omitted. Calling it again on a broadcast that is already
- * `accepted` retries dispatch rather than returning an error. A broadcast that
- * has started sending, or that already reached a final state, returns a conflict.
+ * `accepted` retries dispatch rather than returning an error. Adding
+ * `scheduled_at` to an `accepted` broadcast reschedules it. The request can
+ * instead return `409` with code `E04107` when the broadcast is already being
+ * prepared to send now. The schedule then did not change and the send can still
+ * go out. To stop it, cancel the broadcast right away: canceling stops the
+ * deliveries that have not gone out yet. Read the broadcast to follow its
+ * progress. A broadcast that has started sending, or
+ * that already reached a final state, returns a conflict.
  *
  * The audience's contacts at send time become the recipients after suppressions.
  * The request returns `422` if any of these are true:
@@ -2884,7 +2929,7 @@ export const cancelEmailBroadcast = <ThrowOnError extends boolean = false>(
  *
  * Continues a `paused` broadcast using its saved template references and recipient list, skipping recipients already sent to and applying current consent and suppression checks for its saved category and Brand. If the broadcast has a `brand_id`, resuming keeps that ID; it does not select the current default. Legacy broadcasts with `brand_id: null` keep their original consent scope. Workspace-wide protections still apply. The selected Brand stays in use while the broadcast waits for funds, is paused, or resumes. It cannot be archived until the broadcast finishes or cancellation completes. Marketing broadcasts skip newly unsubscribed recipients; transactional broadcasts retain their category exemptions. Resuming does not use another broadcast from your monthly allowance. A `202` returns `status: sending`; delivery continues asynchronously. Use [get the broadcast](/docs/api/reference/get-email-broadcast) to follow progress.
  *
- * If the broadcast first started sending at least 24 hours ago, review its message and set `confirm` to `true` to acknowledge late delivery. For older broadcasts without `started_at`, the threshold uses the send authorization time, or the creation time if neither timestamp was recorded. You can also send `confirm: true` before that threshold; it does not skip other checks. To review the message, first [get the template](/docs/api/reference/get-email-template) with the broadcast's `template.id` and check its `scope`, which the version read does not return. A `scope` of `system` marks a built-in template, whose lookups return current catalogue content; a `404` means a deleted workspace template, whose pinned version stays readable by ID. For a workspace template, use `template.id` and `template.version_id` with [get a template version](/docs/api/reference/get-email-template-version), then check `template.language` or the version's `default_language`. Both reads require `email_management:read`. Published workspace versions retain their original content and remain readable by ID after template deletion; a deleted or reused slug cannot identify the original message. Broadcasts with frozen content keep sending that content, but older broadcasts can read the catalogue again when resumed. Neither the current lookup nor a copy of an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Once the funding wait has ended, adding funds alone does not restart a paused broadcast: call this operation explicitly after reviewing its content.
+ * If the broadcast first started sending at least 24 hours ago, review its message and set `confirm` to `true` to acknowledge late delivery. For older broadcasts without `started_at`, the threshold uses the send authorization time, or the creation time if neither timestamp was recorded. You can also send `confirm: true` before that threshold; it does not skip other checks. To review the message, first [get the template](/docs/api/reference/get-email-template) with the broadcast's `template.id` and check its `scope`, which the version read does not return. A `scope` of `system` marks a built-in template, whose lookups return current catalogue content; a `404` means a deleted workspace template, whose pinned version stays readable by ID. For a workspace template, use `template.id` and `template.version_id` with [get a template version](/docs/api/reference/get-email-template-version), then check `template.language` or the version's `default_language`. Both reads require `email_management:read`. Published workspace versions retain the template's own original content and remain readable by ID after template deletion, but sections they link from reusable blocks show as currently published; a deleted or reused slug cannot identify the original message. Broadcasts with frozen content keep sending that content, but older broadcasts can read the catalogue again when resumed. Neither the current lookup nor a copy of an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Once the funding wait has ended, adding funds alone does not restart a paused broadcast: call this operation explicitly after reviewing its content.
  *
  * Returns `403` if the workspace is suspended or has been suspended since the original send authorization. `E04102` means a later suspension revoked this broadcast's authorization; reactivation does not restore it, so cancel the broadcast instead of retrying. Do not resend to its full audience without excluding recipients already sent to. Returns `402` if the account is blocked for insufficient funds, or `409` if the broadcast is not paused or needs late-delivery confirmation. A `422` can mean the concurrent broadcast limit is reached or the sender or IP pool needs repair. Read the error details, then wait for a free slot or repair the sender or pool and retry. A `429` can mean a sending limit prevents resuming. These refusals leave the broadcast paused. A `503` means the balance or email limits could not be checked, or Brand unsubscribe links are temporarily unavailable; the broadcast stays paused and you can retry.
  *
@@ -5259,9 +5304,9 @@ export const updateAsset = <ThrowOnError extends boolean = false>(
  * reflect the latest saved versions, so they exclude unsaved editor changes and older
  * published versions.
  *
- * Only resources you have permission to read are included. Email-template references
- * require `email_management:read` in addition to `assets:read`. Hidden resources do not
- * affect the `truncated` flag.
+ * Only resources you have permission to read are included. Email-template and reusable-block
+ * references require `email_management:read` in addition to `assets:read`. Hidden resources
+ * do not affect the `truncated` flag.
  *
  * Removing an asset does not break existing references because its original URL keeps
  * serving. Use this list to find content that should reference a replacement asset.
@@ -13243,7 +13288,11 @@ export const verifyDomain = <ThrowOnError extends boolean = false>(
  *
  * The `email` filter matches by prefix rather than exactly, so `bob@example.com` also returns a suppressed `bob@example.com.au`. Compare the `email` on each record before treating the address you asked about as suppressed.
  *
+ * An empty result does not establish that the address can receive mail. Read `/v1/preferences?channel=email&handle=` with the complete address to inspect its preferences, including Brand and sender scope. Subscribe to `preference.revoked`, `preference.granted`, and `preference.deleted` when maintaining a scoped preference mirror. Bird evaluates delivery policy after accepting a send.
+ *
  * An address can appear more than once because Bird keeps one suppression record per reason. Delivery stays blocked while any blocking record for the address remains.
+ *
+ * Brand-scoped spam complaints are recorded as preferences with origin `complaint` and do not appear in this list. Read `/v1/preferences` to inspect those opt-outs. Complaints without reliable Brand attribution and existing workspace-wide complaint suppressions remain here.
  *
  */
 export const listSuppressions = <ThrowOnError extends boolean = false>(
@@ -13309,9 +13358,11 @@ export const createSuppression = <ThrowOnError extends boolean = false>(
 /**
  * Delete an email suppression
  *
- * Permanently deletes the selected suppression record. Other blocking records for the address remain in effect. Deletion cannot be undone. If the address hard-bounces or the recipient complains again, a new suppression is created automatically.
+ * Permanently deletes the selected suppression record. Other blocking records for the address remain in effect. Deletion cannot be undone. If the address hard-bounces or the recipient complains again, the corresponding protection is recorded automatically.
  *
  * Most records exist because the address bounced or complained. Resuming delivery without cause can harm sender reputation. An address suppressed for several reasons has one record per reason. Delete each blocking record to re-enable delivery. To find a record by address, use `GET /v1/email/suppressions` with the `email` parameter. An ID that does not exist in the workspace returns `404`.
+ *
+ * Brand-scoped complaint preferences are separate from these suppression records. They require a newer individual opt-in through `POST /v1/preferences`; deleting a suppression does not clear them.
  *
  * A record with reason `complaint` can only be deleted by a signed-in dashboard user; an API key gets `422` (`SuppressionNotRemovableByAPIKey`). `hard_bounce` and `manual` records are unaffected and stay removable either way.
  *
@@ -13820,6 +13871,421 @@ export const getEmailCompetitiveVolumeSeries = <
   });
 
 /**
+ * List reusable email blocks
+ *
+ * Returns the workspace's reusable email blocks without their content. Filter by part of the name with `q`, or by archive state with `archived`; leave `archived` out to return active and archived blocks together.
+ */
+export const listEmailBlocks = <ThrowOnError extends boolean = false>(
+  options?: Options<ListEmailBlocksData, ThrowOnError>,
+): RequestResult<
+  ListEmailBlocksResponses,
+  ListEmailBlocksErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListEmailBlocksResponses,
+    ListEmailBlocksErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/blocks",
+    ...options,
+  });
+
+/**
+ * Create a reusable email block
+ *
+ * Creates an unpublished block with a draft in its source language. Send the section as HTML in `fragment`, with `serializer_version` set to `2`: one presentation table whose single content cell sets `lang` to the source language and its own typography, under the rules `fragment_html` lists. Unfinished content can be saved; validating or publishing the block checks it.
+ *
+ * The block is not live until you publish it. Each language keeps the authoring mode of its first section, so a section written as HTML stays HTML.
+ *
+ */
+export const createEmailBlock = <ThrowOnError extends boolean = false>(
+  options: Options<CreateEmailBlockData, ThrowOnError>,
+): RequestResult<
+  CreateEmailBlockResponses,
+  CreateEmailBlockErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateEmailBlockResponses,
+    CreateEmailBlockErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/blocks",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Validate a reusable email section
+ *
+ * Checks a section against the rules applied when it is published: its structure and the content cell's typography, balanced Liquid, and registered contact properties. Contact properties are checked only for a caller with contact read access; without it, validation says nothing about them, and publication still refuses a property that is not registered or is archived. Returns the plain text derived from the section, or a `422` `validation_error` naming each field to correct. Nothing is saved or published. Each call computes a fresh result: an `Idempotency-Key` header is accepted but does not replay an earlier result.
+ */
+export const validateEmailBlockFragment = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ValidateEmailBlockFragmentData, ThrowOnError>,
+): RequestResult<
+  ValidateEmailBlockFragmentResponses,
+  ValidateEmailBlockFragmentErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    ValidateEmailBlockFragmentResponses,
+    ValidateEmailBlockFragmentErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/blocks/validate",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get a reusable email block
+ *
+ * Returns a block's metadata, including archived blocks. Send its `revision` when updating or duplicating the block; each language's content has its own draft revision.
+ */
+export const getEmailBlock = <ThrowOnError extends boolean = false>(
+  options: Options<GetEmailBlockData, ThrowOnError>,
+): RequestResult<GetEmailBlockResponses, GetEmailBlockErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetEmailBlockResponses,
+    GetEmailBlockErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/blocks/{block_id}",
+    ...options,
+  });
+
+/**
+ * Update a reusable email block
+ *
+ * Changes a block's name, description, archive state or source language, using the `revision` you last read. A stale revision returns a `409` `conflict_error`. The source language can change until the block is first published.
+ *
+ * Templates that already link an archived block keep filling it, and new links to it are refused. Unarchive the block to link it again.
+ *
+ */
+export const updateEmailBlock = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateEmailBlockData, ThrowOnError>,
+): RequestResult<
+  UpdateEmailBlockResponses,
+  UpdateEmailBlockErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateEmailBlockResponses,
+    UpdateEmailBlockErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/blocks/{block_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Duplicate a reusable email block
+ *
+ * Copies every current draft language into a new unpublished block, with no publication history or translation-source references. Each language keeps its authoring mode. A change to the source block while copying returns a `409` `conflict_error`.
+ */
+export const duplicateEmailBlock = <ThrowOnError extends boolean = false>(
+  options: Options<DuplicateEmailBlockData, ThrowOnError>,
+): RequestResult<
+  DuplicateEmailBlockResponses,
+  DuplicateEmailBlockErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    DuplicateEmailBlockResponses,
+    DuplicateEmailBlockErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/blocks/{block_id}/duplicate",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Publish a reusable email block
+ *
+ * Publishes the current drafts of the named languages, each with the draft `revision` you last read. All named languages publish together or none do. Saving a draft never publishes.
+ *
+ * Templates that link the block in a published language use the new content for mail that starts afterwards, including broadcasts already scheduled. A message scheduled on its own keeps the content it was accepted with.
+ *
+ * A draft saved after you read it returns a `409` `conflict_error`, and a draft with no unpublished changes or invalid section content returns a `422` `validation_error`. So does a publication that would remove the only unsubscribe link from a live marketing template; the error names up to ten of those templates.
+ *
+ * A publication that makes live templates using the block require a new input the sender supplies returns a `409` `conflict_error` naming the inputs and up to ten templates. Unlike a stale draft, it asks for review: once those senders supply the inputs, repeat the same languages and revisions with `confirm` set to `true`, under a new idempotency key.
+ *
+ */
+export const publishEmailBlock = <ThrowOnError extends boolean = false>(
+  options: Options<PublishEmailBlockData, ThrowOnError>,
+): RequestResult<
+  PublishEmailBlockResponses,
+  PublishEmailBlockErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    PublishEmailBlockResponses,
+    PublishEmailBlockErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/blocks/{block_id}/publish",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List reusable block languages
+ *
+ * Returns the block's languages, ordered by language tag, without their content. Each has its draft `revision`, its `authoring_mode` and its current published revision. A block holds at most 25 languages.
+ */
+export const listEmailBlockLanguages = <ThrowOnError extends boolean = false>(
+  options: Options<ListEmailBlockLanguagesData, ThrowOnError>,
+): RequestResult<
+  ListEmailBlockLanguagesResponses,
+  ListEmailBlockLanguagesErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListEmailBlockLanguagesResponses,
+    ListEmailBlockLanguagesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/blocks/{block_id}/languages",
+    ...options,
+  });
+
+/**
+ * Delete a reusable block language
+ *
+ * Deletes a language that has never been published, with its draft. The block's source language and a language with a published revision cannot be deleted and return a `422` `validation_error`, because templates can link a published language.
+ */
+export const deleteEmailBlockLanguage = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteEmailBlockLanguageData, ThrowOnError>,
+): RequestResult<
+  DeleteEmailBlockLanguageResponses,
+  DeleteEmailBlockLanguageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteEmailBlockLanguageResponses,
+    DeleteEmailBlockLanguageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/blocks/{block_id}/languages/{language}",
+    ...options,
+  });
+
+/**
+ * Get a reusable block language
+ *
+ * Returns the draft section for the exact language requested, with the `revision` to send when saving or publishing it. A missing language returns a `404` `not_found_error` without falling back to another language. A section built in the Bird dashboard's visual editor has `authoring_mode` `visual` and is changed there.
+ */
+export const getEmailBlockLanguage = <ThrowOnError extends boolean = false>(
+  options: Options<GetEmailBlockLanguageData, ThrowOnError>,
+): RequestResult<
+  GetEmailBlockLanguageResponses,
+  GetEmailBlockLanguageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailBlockLanguageResponses,
+    GetEmailBlockLanguageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/blocks/{block_id}/languages/{language}",
+    ...options,
+  });
+
+/**
+ * Upsert a reusable block language
+ *
+ * Replaces one language's draft with a complete section, or copies a published revision back into the draft with `from_revision_id`. Send the draft `revision` you last read, or `0` to add a language. A stale revision returns a `409` `conflict_error`.
+ *
+ * Unfinished content can be saved, and saving never publishes. A language keeps the authoring mode of its first section, so a section in the other mode returns a `422` `validation_error`.
+ *
+ */
+export const upsertEmailBlockLanguage = <ThrowOnError extends boolean = false>(
+  options: Options<UpsertEmailBlockLanguageData, ThrowOnError>,
+): RequestResult<
+  UpsertEmailBlockLanguageResponses,
+  UpsertEmailBlockLanguageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).put<
+    UpsertEmailBlockLanguageResponses,
+    UpsertEmailBlockLanguageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/blocks/{block_id}/languages/{language}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List published block revisions
+ *
+ * Returns the retained publications of the exact language, highest `version_number` first by default. A `version_number` counts publications of the language and is separate from the draft `revision`. Drafts that were never published are not listed.
+ */
+export const listEmailBlockRevisions = <ThrowOnError extends boolean = false>(
+  options: Options<ListEmailBlockRevisionsData, ThrowOnError>,
+): RequestResult<
+  ListEmailBlockRevisionsResponses,
+  ListEmailBlockRevisionsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListEmailBlockRevisionsResponses,
+    ListEmailBlockRevisionsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/blocks/{block_id}/languages/{language}/revisions",
+    ...options,
+  });
+
+/**
+ * Get a published block revision
+ *
+ * Returns one published revision of the exact block and language, including for archived blocks. To make it the draft again, save the language with `from_revision_id`. A revision that was never published returns a `404` `not_found_error`.
+ */
+export const getEmailBlockRevision = <ThrowOnError extends boolean = false>(
+  options: Options<GetEmailBlockRevisionData, ThrowOnError>,
+): RequestResult<
+  GetEmailBlockRevisionResponses,
+  GetEmailBlockRevisionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailBlockRevisionResponses,
+    GetEmailBlockRevisionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/blocks/{block_id}/languages/{language}/revisions/{revision_id}",
+    ...options,
+  });
+
+/**
  * List email templates
  *
  * Returns a paginated list of email templates, newest first.
@@ -13906,7 +14372,7 @@ export const createEmailTemplate = <ThrowOnError extends boolean = false>(
  *
  * Deletes the template from authoring and lists. The slug becomes available for reuse in the workspace, and the deletion cannot be undone.
  *
- * Published versions remain readable and previewable when you supply the template ID and version ID, so you can review the original content of a started broadcast. Deletion does not remove access to that published content. The draft is unavailable, and the old slug can refer to a different template after reuse.
+ * Published versions remain readable and previewable when you supply the template ID and version ID, so you can review the original content of a started broadcast. Sections linked from reusable blocks show their current publication, which can differ from what a started broadcast froze. Deletion does not remove access to that published content. The draft is unavailable, and the old slug can refer to a different template after reuse.
  *
  * A template can't be deleted while a broadcast that has not started sending still uses it, because a `scheduled` or `accepted` broadcast has not pinned the content it will send yet. [List the broadcasts blocking a template delete](/docs/api/reference/list-email-template-broadcasts) to see which ones those are. A broadcast that has already started sending does not block the delete: it pinned its version when it started, so it keeps sending the content it froze.
  *
@@ -14018,7 +14484,8 @@ export const updateEmailTemplate = <ThrowOnError extends boolean = false>(
  * the source's current content. It inherits the source's category, authoring
  * format (`source`), and description. Copying a workspace template also
  * carries over its default language and its missing-language policy, so the
- * copy behaves like what it was copied from. The copy starts unpublished.
+ * copy behaves like what it was copied from. Links to reusable blocks are
+ * kept, so the copy fills the same blocks. The copy starts unpublished.
  *
  * By default the copy's slug derives from the source's slug, for example
  * `welcome-email-copy`, with a numeric suffix added if that slug is already
@@ -14126,7 +14593,7 @@ export const getEmailTemplatePreview = <ThrowOnError extends boolean = false>(
 /**
  * List email template versions
  *
- * Returns the template's versions as a cursor page (the current draft plus all published versions), newest first. Each entry names its languages without returning their content. Templates retain every language of every submitted version, so listing their content would grow the response with the template's history. Read a single version for its content.
+ * Returns the template's versions as a cursor page (the current draft plus all published versions), newest first. Each entry names its languages without returning their content. Templates retain every language of every submitted version, so listing their content would grow the response with the template's history. Read a single version for its content. A published version's `variables` here leave out inputs of sections linked from reusable blocks; the single-version read includes them.
  *
  */
 export const listEmailTemplateVersions = <ThrowOnError extends boolean = false>(
@@ -14228,7 +14695,7 @@ export const deleteEmailTemplateVersion = <
  * - The content it froze in every language.
  * - Its `variables`: the parameters you supply when sending and the values Bird fills in for each recipient, told apart by `system`.
  *
- * A deleted workspace template's published versions remain readable when you pass its template ID as `template_ref`. Its slug can belong to a newer template, and its draft is no longer readable. Use the pinned IDs from a broadcast to review its original content before resuming.
+ * A deleted workspace template's published versions remain readable when you pass its template ID as `template_ref`. Its slug can belong to a newer template, and its draft is no longer readable. Use the pinned IDs from a broadcast to review its original content before resuming. Sections the version links from reusable blocks show as currently published, not as the broadcast froze them. Leave the broadcast paused if you cannot verify what its remaining recipients will receive.
  *
  * Use [List email template versions](/docs/api/reference/list-email-template-versions) to enumerate the draft and published versions. [Roll back an email template](/docs/api/reference/rollback-email-template) makes an earlier published version live again. Returns a `404 Not Found` error if the template or version does not exist in the workspace.
  *
@@ -14332,6 +14799,8 @@ export const deleteEmailTemplateLanguage = <
  *
  * Works on any version, including a published version whose content is frozen. Returns a `404 Not Found` error if the version does not have the language.
  *
+ * In a language that links reusable blocks (`has_shared_blocks`), the HTML shows each block's current published content and changes when a block is published. Copying that HTML into another template creates independent content. Set `authoring` to `true` to read the HTML with its block markers and the `shared_blocks` links instead, which is what a save of the language needs.
+ *
  */
 export const getEmailTemplateLanguage = <ThrowOnError extends boolean = false>(
   options: Options<GetEmailTemplateLanguageData, ThrowOnError>,
@@ -14365,6 +14834,8 @@ export const getEmailTemplateLanguage = <ThrowOnError extends boolean = false>(
  * The language must already exist on the draft. A language it does not have returns a `404` `not_found_error`. Save the language's full content instead to create it.
  *
  * Send the `revision` you last read to have a concurrent edit rejected with a `409` `conflict_error`. Only a draft can be edited. Addressing a published version returns a `422` `validation_error`.
+ *
+ * On a language that links reusable blocks, send the `revision` and change only `subject` or `preview_text` here. Changing its body takes a full save with its `shared_blocks`.
  *
  */
 export const updateEmailTemplateLanguage = <
@@ -14406,6 +14877,8 @@ export const updateEmailTemplateLanguage = <
  *
  * Only a draft can be saved: addressing a published version returns a `422` `validation_error`, because a published version never changes. A template holds at most 25 languages.
  *
+ * To link reusable blocks, send `shared_blocks` and place one HTML comment marker, `bird:shared-block:` followed by the binding's UUID, in `html` for each of its bindings, with an empty `text` and the `revision` read with `authoring` set to `true`. A language that already links blocks must be saved this way whenever its body changes. A language edited in the Bird dashboard's visual editor is changed in the dashboard, and this save returns a `422` `validation_error` for it.
+ *
  */
 export const upsertEmailTemplateLanguage = <
   ThrowOnError extends boolean = false,
@@ -14440,7 +14913,7 @@ export const upsertEmailTemplateLanguage = <
 /**
  * Roll back an email template
  *
- * Makes an earlier published version the live version used by sends, and replaces the draft with that version's content so editing continues from it. The change is immediate. No new version is created, and the version history is unchanged. Include the draft `revision` you last read, so the request is rejected with a conflict if someone else changed the draft first. The draft's current content is replaced. Rolling back to the currently live version is allowed and resets the draft to it. Only published versions can be rolled back to.
+ * Makes an earlier published version the live version used by sends, and replaces the draft with that version's content so editing continues from it. The change is immediate. No new version is created, and the version history is unchanged. Include the draft `revision` you last read, so the request is rejected with a conflict if someone else changed the draft first. The draft's current content is replaced. Rolling back to the currently live version is allowed and resets the draft to it. The version's links to reusable blocks come back with its content. Only published versions can be rolled back to.
  *
  */
 export const rollbackEmailTemplate = <ThrowOnError extends boolean = false>(
@@ -15772,8 +16245,10 @@ export const listNumbersOrders = <ThrowOnError extends boolean = false>(
  * inventory or acquired from a supplier, the response contains an order.
  *
  * Most orders complete immediately and return `201` with `status` of
- * `completed` and `number_id` populated. Read the number with
- * `GET /v1/numbers/{number_id}`. An order that cannot complete in the request
+ * `completed` and `number_id` populated. That ID identifies the associated
+ * workspace allocation; multiple orders can refer to it. Read its current holding
+ * state with `GET /v1/numbers/{number_id}`, which can return not found after release.
+ * The completed order remains in history. An order that cannot complete in the request
  * returns `202`; poll `GET /v1/numbers/orders/{order_id}` until it is
  * `completed` or `failed`.
  *
@@ -15816,7 +16291,7 @@ export const createNumbersOrder = <ThrowOnError extends boolean = false>(
 /**
  * Get a number order
  *
- * Returns a single number order by id, including its current lifecycle state and, once completed, the number it produced.
+ * Returns a number order by id, including its lifecycle state and, once completed, the associated allocation. The association remains in order history after release; reading the number can then return not found.
  */
 export const getNumbersOrder = <ThrowOnError extends boolean = false>(
   options: Options<GetNumbersOrderData, ThrowOnError>,

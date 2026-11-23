@@ -42,7 +42,7 @@ export class NumbersOrdersResource extends Resource {
   }
 
   /**
-   * Reads one order's current state, and the number it produced once completed. This is the poll for an order that came back pending.
+   * Reads one order's state and its associated allocation once completed. Poll an order that came back pending here; read the number for its current holding state.
    *
    * @example Poll an order that did not finish inline
    * const order = await bird.numbers.orders.get("nor_01krdgeqcxet5s7t44vh8rt9mg");

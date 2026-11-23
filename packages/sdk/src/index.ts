@@ -515,6 +515,8 @@ export {
   AssetKind,
   AssetReferenceUsage,
   AutomaticSeedingReason,
+  EmailAuthoringMode,
+  EmailBlockSubmissionStatus,
   EsimActionName,
   EsimActionUnavailableReason,
   AMBBusinessAccountReviewStatus,
@@ -634,6 +636,8 @@ export type {
   AssetKindValue,
   AssetReferenceUsageValue,
   AutomaticSeedingReasonValue,
+  EmailAuthoringModeValue,
+  EmailBlockSubmissionStatusValue,
   EsimActionNameValue,
   EsimActionUnavailableReasonValue,
   AMBBusinessAccountReviewStatusValue,
@@ -806,9 +810,31 @@ export type {
   EmailTemplateLanguage,
   EmailTemplateLanguageList,
   EmailTemplateLanguageSaved,
+  EmailTemplatesVersionsLanguagesGetQuery,
   EmailTemplatesVersionsLanguagesSetParams,
   EmailTemplatesVersionsLanguagesUpdateParams,
 } from "./resources/emailTemplatesVersionsLanguages.gen.js";
+export type {
+  EmailBlock,
+  EmailBlockFragmentValidation,
+  EmailBlockSubmission,
+  EmailBlocksListQuery,
+  EmailBlocksCreateParams,
+  EmailBlocksUpdateParams,
+  EmailBlocksDuplicateParams,
+  EmailBlocksValidateParams,
+  EmailBlocksPublishParams,
+} from "./resources/emailBlocks.gen.js";
+export type {
+  EmailBlockLanguage,
+  EmailBlockLanguageList,
+  EmailBlocksLanguagesSetParams,
+} from "./resources/emailBlocksLanguages.gen.js";
+export type {
+  EmailBlockRevision,
+  EmailBlockRevisionSummary,
+  EmailBlocksLanguagesRevisionsListQuery,
+} from "./resources/emailBlocksLanguagesRevisions.gen.js";
 
 export type {
   EmailCompetitiveVolumeSeries,

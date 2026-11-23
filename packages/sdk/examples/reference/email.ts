@@ -638,3 +638,128 @@ export async function seeding_sources_list() {
     console.log(source.state, source.run_id);
   }
 }
+
+export async function emailBlocksList() {
+  // Requires email_management:read permission in the target workspace.
+  for await (const block of bird.email.blocks.list({ q: "footer", archived: false })) {
+    console.log(block.id, block.name, block.source_language);
+  }
+}
+
+export async function emailBlocksGet() {
+  // Requires email_management:read permission in the target workspace.
+  const block = await bird.email.blocks.get("ebl_01krdgeqcxet5s7t44vh8rt9mg");
+  console.log(block.name, block.revision, block.archived_at);
+}
+
+export async function emailBlocksCreate() {
+  // Requires email_management:write permission in the target workspace.
+  const section =
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tbody><tr>' +
+    '<td lang="en" style="font-family: Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: normal; ' +
+    'line-height: 20px; letter-spacing: normal; text-align: left; text-transform: none; color: #333333; margin: 0; padding: 16px;">' +
+    '<p style="margin: 0;">Offer valid until {{ expiry_date }}.</p></td></tr></tbody></table>';
+  const block = await bird.email.blocks.create({
+    name: "Legal footer",
+    source_language: "en",
+    fragment: { serializer_version: 2, fragment_html: section },
+  });
+  console.log(block.id, block.revision);
+}
+
+export async function emailBlocksUpdate() {
+  // Requires email_management:write permission in the target workspace.
+  const current = await bird.email.blocks.get("ebl_01krdgeqcxet5s7t44vh8rt9mg");
+  const block = await bird.email.blocks.update(current.id, {
+    revision: current.revision,
+    archived: true,
+  });
+  console.log(block.archived_at);
+}
+
+export async function emailBlocksDuplicate() {
+  // Requires email_management:write permission in the target workspace.
+  const source = await bird.email.blocks.get("ebl_01krdgeqcxet5s7t44vh8rt9mg");
+  const copy = await bird.email.blocks.duplicate(source.id, {
+    revision: source.revision,
+    name: "Legal footer (EU)",
+  });
+  console.log(copy.id);
+}
+
+export async function emailBlocksValidate() {
+  // Requires email_management:read permission in the target workspace.
+  const section =
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tbody><tr>' +
+    '<td lang="en" style="font-family: Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: normal; ' +
+    'line-height: 20px; letter-spacing: normal; text-align: left; text-transform: none; color: #333333; margin: 0; padding: 16px;">' +
+    '<p style="margin: 0;">Offer valid until {{ expiry_date }}.</p></td></tr></tbody></table>';
+  const result = await bird.email.blocks.validate({
+    language: "en",
+    fragment: { serializer_version: 2, fragment_html: section },
+  });
+  console.log(result.text);
+}
+
+export async function emailBlocksPublish() {
+  // Requires email_management:write permission in the target workspace.
+  const blockId = "ebl_01krdgeqcxet5s7t44vh8rt9mg";
+  const draft = await bird.email.blocks.languages.get(blockId, "en");
+  const submission = await bird.email.blocks.publish(blockId, {
+    languages: [{ language: "en", revision: draft.revision }],
+  });
+  console.log(submission.status, submission.published_revisions);
+}
+
+export async function emailBlocksLanguagesList() {
+  // Requires email_management:read permission in the target workspace.
+  const languages = await bird.email.blocks.languages.list("ebl_01krdgeqcxet5s7t44vh8rt9mg");
+  for (const language of languages.data) {
+    console.log(language.language, language.revision, language.published_revision_id);
+  }
+}
+
+export async function emailBlocksLanguagesGet() {
+  // Requires email_management:read permission in the target workspace.
+  const draft = await bird.email.blocks.languages.get("ebl_01krdgeqcxet5s7t44vh8rt9mg", "en");
+  console.log(draft.authoring_mode, draft.revision, draft.fragment.fragment_html);
+}
+
+export async function emailBlocksLanguagesSet() {
+  // Requires email_management:write permission in the target workspace.
+  const section =
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tbody><tr>' +
+    '<td lang="fr" style="font-family: Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: normal; ' +
+    'line-height: 20px; letter-spacing: normal; text-align: left; text-transform: none; color: #333333; margin: 0; padding: 16px;">' +
+    '<p style="margin: 0;">Offre valable jusqu\'au {{ expiry_date }}.</p></td></tr></tbody></table>';
+  const draft = await bird.email.blocks.languages.set("ebl_01krdgeqcxet5s7t44vh8rt9mg", "fr", {
+    revision: 0,
+    fragment: { serializer_version: 2, fragment_html: section },
+  });
+  console.log(draft.revision);
+}
+
+export async function emailBlocksLanguagesDelete() {
+  // Requires email_management:write permission in the target workspace.
+  await bird.email.blocks.languages.delete("ebl_01krdgeqcxet5s7t44vh8rt9mg", "fr");
+}
+
+export async function emailBlocksLanguagesRevisionsList() {
+  // Requires email_management:read permission in the target workspace.
+  for await (const revision of bird.email.blocks.languages.revisions.list(
+    "ebl_01krdgeqcxet5s7t44vh8rt9mg",
+    "en",
+  )) {
+    console.log(revision.id, revision.version_number, revision.published_at);
+  }
+}
+
+export async function emailBlocksLanguagesRevisionsGet() {
+  // Requires email_management:read permission in the target workspace.
+  const revision = await bird.email.blocks.languages.revisions.get(
+    "ebl_01krdgeqcxet5s7t44vh8rt9mg",
+    "en",
+    "ebr_01krdgeqcxet5s7t44vh8rt9mg",
+  );
+  console.log(revision.version_number, revision.fragment.fragment_html);
+}

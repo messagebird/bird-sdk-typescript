@@ -29,6 +29,7 @@ import { EmailStatsResource } from "./emailStats.gen.js";
 import { EmailMailboxesResource } from "./emailMailboxes.js";
 import { EmailThreadsResource } from "./emailThreads.js";
 import { EmailTemplatesResource } from "./emailTemplates.js";
+import { EmailBlocksResource } from "./emailBlocks.js";
 import type {
   APIPromise,
   PaginatedPromise,
@@ -73,6 +74,9 @@ export class EmailResource<
   /** Reusable templates — `bird.email.templates.list(...)`, `.create(...)`, `.versions.submit(...)`, … */
   readonly templates: EmailTemplatesResource;
 
+  /** Reusable sections templates link — `bird.email.blocks.list(...)`, `.publish(...)`, `.languages.set(...)`, … */
+  readonly blocks: EmailBlocksResource;
+
   constructor(
     core: ConstructorParameters<typeof Resource>[0],
     client: ConstructorParameters<typeof Resource>[1],
@@ -87,6 +91,7 @@ export class EmailResource<
     this.mailboxes = new EmailMailboxesResource(core, client, defaults);
     this.threads = new EmailThreadsResource(core, client);
     this.templates = new EmailTemplatesResource(core, client);
+    this.blocks = new EmailBlocksResource(core, client);
   }
 
   /**

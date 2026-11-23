@@ -212,18 +212,6 @@ export type WebhookEvent =
       type: "whatsapp_suppression.created";
     } & EventWhatsAppSuppressionCreated);
 
-/**
- * Sort direction, ascending or descending.
- */
-export type SortOrder = "asc" | "desc";
-
-export type BrandId = string;
-
-export type Timestamps = {
-  readonly created_at: string;
-  readonly updated_at: string;
-};
-
 export type ListEnvelope = {
   /**
    * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
@@ -237,6 +225,11 @@ export type ListEnvelope = {
    * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
    */
   refresh_cursor: string | null;
+};
+
+export type Timestamps = {
+  readonly created_at: string;
+  readonly updated_at: string;
 };
 
 export type ErrorDetail = {
@@ -411,6 +404,13 @@ export type ErrorBody = {
 export type Error = {
   error: ErrorBody;
 };
+
+/**
+ * Sort direction, ascending or descending.
+ */
+export type SortOrder = "asc" | "desc";
+
+export type BrandId = string;
 
 /**
  * A template's slug: what you send it by, for example `welcome-email`. Email and SMS slugs stay fixed after creation. WhatsApp slugs can change only before the first submission. A slug can contain lowercase letters, numbers, hyphens, and underscores, has to start and end with a letter or a number, and can be up to 63 characters long.
@@ -967,7 +967,7 @@ export type EmailStatsSummaryPeriod = {
    */
   readonly to: string;
   /**
-   * The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response reflects data from up to a few seconds ago. Use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.
+   * The best-effort refresh time of the statistics in this response; when they come from several rollups, it is the oldest of their latest refreshes. Events recorded before roughly this time are usually reflected, while more recent events may not be yet. Statistics are served from rolling aggregations that usually refresh within a minute, so a response can trail the latest events by a minute or more. Use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are up to the second. Null when the freshness boundary is not being reported.
    *
    */
   readonly data_as_of?: string | null;
@@ -1367,7 +1367,7 @@ export type EmailStatsPeriod = {
    */
   readonly to: string;
   /**
-   * The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response reflects data from up to a few seconds ago. Use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.
+   * The best-effort refresh time of the statistics in this response; when they come from several rollups, it is the oldest of their latest refreshes. Events recorded before roughly this time are usually reflected, while more recent events may not be yet. Statistics are served from rolling aggregations that usually refresh within a minute, so a response can trail the latest events by a minute or more. Use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are up to the second. Null when the freshness boundary is not being reported.
    *
    */
   readonly data_as_of?: string | null;
@@ -4440,7 +4440,7 @@ export type EmailMessage = {
    */
   readonly template_id?: EmailTemplateId | null;
   /**
-   * The exact template version this send rendered from, or null for an inline send. A template's live version changes every time you submit it, so this is what identifies the wording that was actually delivered, together with `resolved_language`.
+   * The exact template version this send rendered from, or null for an inline send. A template's live version changes every time you submit it, so this identifies the source of the send, together with `resolved_language`. Reading that version later does not reproduce the delivered wording when the template links a reusable block, because the block shows its latest published content. The stored message content holds the delivered body while it is available.
    *
    */
   readonly template_version_id?: EmailTemplateVersionId | null;
@@ -4672,7 +4672,7 @@ export type EmailMessageSendRequest = {
    */
   attachments?: Array<EmailAttachment>;
   /**
-   * Send at this future time instead of immediately, at least 30 seconds and at most 30 days ahead; outside that range returns `422`. The message returns `accepted` and reads as `scheduled` until it sends, and the message cancel endpoint cancels it before then. Scheduled sends count against your plan's monthly scheduled-email allowance, and a send over it returns `422`. A stored template's published version, language and parameter values are pinned at acceptance, so a later publication does not change what sends; deleting the template before the message is due rejects it with `generation_failure`. Sender eligibility and send-volume allowance are checked again when it is due. Batch items take this field too, so one batch can mix scheduled and immediate messages.
+   * Send at this future time instead of immediately, at least 30 seconds and at most 30 days ahead; outside that range returns `422`. The message returns `accepted` and reads as `scheduled` until it sends, and the message cancel endpoint cancels it before then. Scheduled sends count against your plan's monthly scheduled-email allowance, and a send over it returns `422`. A stored template's published version, language and parameter values are pinned at acceptance, so a later publication does not change what sends; deleting the template before the message is due rejects it with `generation_failure`. Sender eligibility and send-volume allowance are checked again when it is due. Bodies and attachment contents count toward the same 20 MB message limit as an immediate send. The rest of the request, such as recipients, `headers`, `metadata`, parameters and attachment file names, shares a separate 31 KB limit, and a send over it returns `422`. Batch items take this field too, so one batch can mix scheduled and immediate messages.
    */
   scheduled_at?: string;
   /**
@@ -4721,7 +4721,7 @@ export type EmailMessageBatchItem = {
    */
   readonly template_id?: EmailTemplateId | null;
   /**
-   * The exact template version this item rendered from, or null for an inline item. Record it if you need to reproduce what was sent: a template's live version changes every time you submit it.
+   * The exact template version this item rendered from, or null for an inline item. Record it to know which version a message came from: a template's live version changes every time you submit it. Reading that version later does not reproduce the delivered wording when the template links a reusable block, because the block shows its latest published content. The stored message content holds the delivered body while it is available.
    *
    */
   readonly template_version_id?: EmailTemplateVersionId | null;
@@ -5104,6 +5104,22 @@ export type AudienceId = string;
 export type ContactId = string;
 
 /**
+ * How a broadcast takes part in automatic seeding. The seed pool, engagement profile and regions come from the workspace's automatic seeding settings.
+ *
+ */
+export type EmailBroadcastAutomaticSeeding = {
+  /**
+   * Whether the broadcast sends seed copies. False sends none, even when the audience contains a contact at the trigger address.
+   */
+  enabled: boolean;
+  /**
+   * The contact whose values fill the personal fields in the seed copies. It belongs to this workspace but need not be in the audience; choosing it does not change who receives the broadcast. Null when personal fields use their fallback values.
+   *
+   */
+  example_contact_id: ContactId | null;
+};
+
+/**
  * A bare template input name, such as `first_name` or `offer`, outside the reserved `bird` namespace.
  */
 export type EmailBroadcastParameterName = string;
@@ -5207,6 +5223,9 @@ export type EmailBroadcastFundingHold = {
  * - `render_budget_exceeded`: rendering went over a limit, named by `budget` with its `limit`.
  * - `transport_missing`: the saved content of a prepared broadcast is unavailable. Contact Bird support.
  * - `transport_invalid`: the saved content of a prepared broadcast no longer matches what was prepared. Contact Bird support.
+ * - `seed_example_value_missing`: automatic seeding has no example contact, and the template requires the contact field at `pointer`, which has no fallback value. Choose an example contact or give the field a fallback value. Seed copies are not sent until then.
+ * - `seeding_not_configured`: automatic seeding is on, but the workspace's automatic seeding settings are not saved or are turned off. Save them before sending, or no seed copies are sent.
+ * - `seed_tests_exhausted`: automatic seeding is on, but the organization has no seed tests left this period, so no seed copies are sent.
  *
  */
 export type EmailBroadcastParameterProblemCode =
@@ -5234,6 +5253,9 @@ export type EmailBroadcastParameterProblemCode =
   | "render_budget_exceeded"
   | "transport_missing"
   | "transport_invalid"
+  | "seed_example_value_missing"
+  | "seeding_not_configured"
+  | "seed_tests_exhausted"
   | (string & {});
 
 /**
@@ -5251,9 +5273,11 @@ export type EmailBroadcastParameterProblemPhase =
  * How a broadcast input diagnostic affects sending.
  *
  * - `error`: the broadcast cannot send until the problem is fixed.
+ * - `warning`: the broadcast can send, but something it asks for will not happen, such as its automatic seed test.
  *
  */
-export type EmailBroadcastParameterProblemSeverity = "error" | (string & {});
+export type EmailBroadcastParameterProblemSeverity =
+  "error" | "warning" | (string & {});
 
 /**
  * The part of the email where the input is used.
@@ -5324,6 +5348,11 @@ export type EmailBroadcastFailureParameters = {
 };
 
 export type EmailBroadcast = {
+  /**
+   * The broadcast's automatic seeding choice, or null when a seed test starts only from a contact at the workspace's trigger address in the audience. Returned on single-broadcast reads and on create and update responses to callers with Inbox Insights read and contact read permission. Not included in lists.
+   *
+   */
+  automatic_seeding?: EmailBroadcastAutomaticSeeding | null;
   /**
    * Broadcast ID.
    */
@@ -5529,6 +5558,23 @@ export type EmailBroadcastList = {
 } & ListEnvelope;
 
 /**
+ * How a broadcast takes part in automatic seeding. The seed pool, engagement profile and regions come from the workspace's automatic seeding settings.
+ *
+ */
+export type EmailBroadcastAutomaticSeedingInput = {
+  /**
+   * Whether the broadcast sends seed copies. False sends none, even when the audience contains a contact at the trigger address. A seeded send spends one of the organization's seed tests. When the workspace's automatic seeding is off or the organization has no seed tests left, the broadcast still sends without seed copies; validate the broadcast first to see these as warnings.
+   *
+   */
+  enabled: boolean;
+  /**
+   * A contact whose values fill the personal fields in the seed copies, such as a first name. It must belong to this workspace but need not be in the audience; choosing it does not change who receives the broadcast. Its details reach external seed mailboxes, so use a test contact. While seeding is enabled, sending refuses a chosen contact that has since been deleted, so choose another or leave it out. Leave it out to fill personal fields with their fallback values.
+   *
+   */
+  example_contact_id?: ContactId;
+};
+
+/**
  * The template a new broadcast sends, and which of that template's languages goes out.
  *
  */
@@ -5561,6 +5607,11 @@ export type EmailBroadcastHeaders = {
  *
  */
 export type EmailBroadcastCreateRequest = {
+  /**
+   * Whether this broadcast sends seed copies for an automatic seed test. Leave it out to start a seed test only when the audience contains a contact at the workspace's trigger address. Send `enabled: false` to send no seed copies at all. Needs Inbox Insights write permission, and contact read permission to choose an example contact. Turning seeding on returns `404 not_found` while automatic seeding is unavailable to the workspace.
+   *
+   */
+  automatic_seeding?: EmailBroadcastAutomaticSeedingInput;
   /**
    * The address the broadcast sends from. Give it as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. The domain has to be one this workspace has verified.
    */
@@ -5650,6 +5701,11 @@ export type EmailBroadcastTemplateUpdate = {
  *
  */
 export type EmailBroadcastUpdateRequest = {
+  /**
+   * Replaces the broadcast's automatic seeding choice. Leave it out to keep the saved choice. Send null to start a seed test only when the audience contains a contact at the workspace's trigger address. An object without `example_contact_id` removes the example contact, so seed copies use fallback values. Needs Inbox Insights write permission, and contact read permission to choose an example contact. Turning seeding on, or changing it while it is on, returns `404 not_found` while automatic seeding is unavailable to the workspace. Resending the saved choice, turning it off and sending null still succeed.
+   *
+   */
+  automatic_seeding?: EmailBroadcastAutomaticSeedingInput | null;
   /**
    * The address the broadcast sends from. Give it as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. The domain has to be one this workspace has verified.
    */
@@ -5979,7 +6035,7 @@ export type EmailBroadcastValidationResult = {
    */
   resolution?: EmailBroadcastResolution;
   /**
-   * The problems found. Empty when `ready_for_admission` is true.
+   * The problems found. Problems with severity `error` block sending, and none remain when `ready_for_admission` is true. Problems with severity `warning` do not block sending.
    */
   problems: Array<EmailBroadcastParameterProblem>;
   /**
@@ -6086,7 +6142,7 @@ export type EmailBroadcastSendNowRequest = {
 
 export type EmailBroadcastResume = {
   /**
-   * Acknowledgment that the message reaches the remaining recipients later than intended. It is required to resume a broadcast that started sending at least 24 hours ago. Before setting it, read the broadcast's `started_at` and have a reviewer with `email_management:read` read its template by `template.id` to check `scope`, then, for a workspace template or one the template read reports deleted (`404`), its pinned version using `template.id` and `template.version_id`. Workspace versions retain the original content. A built-in template (`scope: system`) shows current catalogue content, and only the template read returns `scope`. Broadcasts with frozen content keep it, but older broadcasts can read the catalogue again when resumed. Neither a current lookup nor an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Ask an authorized teammate if you lack that permission. It does not skip the funds or concurrent-broadcast checks.
+   * Acknowledgment that the message reaches the remaining recipients later than intended. It is required to resume a broadcast that started sending at least 24 hours ago. Before setting it, read the broadcast's `started_at` and have a reviewer with `email_management:read` read its template by `template.id` to check `scope`, then, for a workspace template or one the template read reports deleted (`404`), its pinned version using `template.id` and `template.version_id`. Workspace versions retain the template's own original content; sections linked from reusable blocks show as currently published. A built-in template (`scope: system`) shows current catalogue content, and only the template read returns `scope`. Broadcasts with frozen content keep it, but older broadcasts can read the catalogue again when resumed. Neither a current lookup nor an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Ask an authorized teammate if you lack that permission. It does not skip the funds or concurrent-broadcast checks.
    */
   confirm?: boolean;
 };
@@ -6509,6 +6565,10 @@ export type Preference = {
    * The contact whose handle matched when the statement was recorded. Null when no contact matched at that moment; it is not updated when contacts change later.
    */
   readonly contact_id?: ContactId | null;
+  /**
+   * The email that caused the most recent recorded spam complaint for this preference. Null when no complaint is recorded. Retained after a newer individual opt-in clears complaint protection; check status and origin for the current preference.
+   */
+  readonly complaint_message_id?: EmailId | null;
   /**
    * The business this email preference belongs to.
    */
@@ -9188,7 +9248,7 @@ export type AssetReference = {
    */
   readonly resource_type: string;
   /**
-   * The resource's own identifier, carrying that resource's prefix (`emt_` for an email template), for linking straight to it.
+   * The resource's own identifier, carrying that resource's prefix: `emt_` for an email template, `ebl_` for a reusable email block. A reusable block is identified here by ID and name; the API does not yet return its content.
    */
   readonly resource_id: string;
   /**
@@ -20461,7 +20521,7 @@ export type EmailStatsSeriesPeriod = {
   readonly to: string;
   readonly grain: StatsGrain;
   /**
-   * The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response reflects data from up to a few seconds ago. Use this field to label data freshness rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.
+   * The best-effort refresh time of the statistics in this response; when they come from several rollups, it is the oldest of their latest refreshes. Events recorded before roughly this time are usually reflected, while more recent events may not be yet. Statistics are served from rolling aggregations that usually refresh within a minute, so a response can trail the latest events by a minute or more. Use this field to label data freshness rather than assuming the numbers are up to the second. Null when the freshness boundary is not being reported.
    *
    */
   readonly data_as_of?: string | null;
@@ -22892,6 +22952,323 @@ export type EmailCompetitiveVolumeSeries = {
 };
 
 /**
+ * Field used to order reusable email blocks.
+ */
+export type EmailBlockSortField = "created_at" | "name";
+
+export type EmailBlockId = string;
+
+/**
+ * A reusable email section with independently editable languages.
+ */
+export type EmailBlock = {
+  id: EmailBlockId;
+  /**
+   * Name for people choosing the block, such as when linking it into a template.
+   */
+  name: string;
+  /**
+   * Optional notes for people maintaining the block. Omitted when empty.
+   */
+  description?: string;
+  source_language: LanguageTag;
+  /**
+   * Metadata revision to send when editing or duplicating this block.
+   */
+  revision: number;
+  /**
+   * Who created the block. A duplicate is created by whoever duplicated it.
+   */
+  created_by: Actor;
+  /**
+   * Present when the block is archived. Retained published content remains readable.
+   */
+  archived_at?: string;
+} & Timestamps;
+
+/**
+ * A page of blocks.
+ */
+export type EmailBlockList = {
+  data: Array<EmailBlock>;
+} & ListEnvelopeWithTotal;
+
+/**
+ * One self-contained email section. Version 2 is a section written as HTML and sends `fragment_html` alone; the API, SDKs, CLI and MCP write version 2. Version 1 is reserved for sections built in the Bird dashboard's visual editor, and only the dashboard saves it. A block language keeps the version it was created with.
+ */
+export type EmailBlockFragment = {
+  /**
+   * How this section is written. 2 is HTML written directly, and is the value to send from the API, SDKs, CLI and MCP. 1 is reserved for the Bird dashboard's visual editor; other callers get a `422` for it.
+   */
+  serializer_version: number;
+  /**
+   * Section HTML. Unfinished markup can be saved as a draft; validation checks readiness separately. A version 2 section is one presentation table with one `tbody`, `tr` and `td`, and all layout stays inside that cell. The cell sets `lang` to the block language and its own typography: `font-family`, a `font-size` in pixels, `font-style`, `font-weight`, `line-height`, `letter-spacing`, `text-align` (not `start` or `end`), `text-transform`, `color`, `margin` and `padding`. Root-relative units such as `rem` are refused; use px, em or percentages. Liquid stays balanced inside the cell, cannot use `assign`, `capture`, `increment` or `decrement`, and puts no control tag inside an attribute or style value. `{{ bird.unsubscribe_url }}` appears only as bare text or as the entire `href` of an `<a>`, and never inside an `if !mso` conditional comment, which Outlook skips. No document wrapper, `<style>`, script, form, `class` or `id` attribute. A table nested in the cell needs its own `<tbody>`. Inside a complete Outlook conditional comment, prefixed Office and VML elements such as `v:fill` may self-close, and a balanced `if !mso` conditional comment that shows its content outside Outlook is accepted when it holds no other conditional comment.
+   */
+  fragment_html: string;
+};
+
+/**
+ * Create an unpublished block and its source-language draft.
+ */
+export type EmailBlockCreate = {
+  /**
+   * Name for people choosing the block, such as when linking it into a template.
+   */
+  name: string;
+  /**
+   * Optional notes for people maintaining the block.
+   */
+  description?: string;
+  source_language: LanguageTag;
+  /**
+   * Initial source-language content, as an HTML section. Its `serializer_version` sets the language's authoring mode. Leaving it out returns a `422` `validation_error`, except in the Bird dashboard, which starts an empty visual draft.
+   */
+  fragment?: EmailBlockFragment;
+};
+
+/**
+ * Check a section's markup, variables and contact properties without saving it.
+ */
+export type EmailBlockFragmentValidationRequest = {
+  language: LanguageTag;
+  fragment: EmailBlockFragment;
+};
+
+/**
+ * Successful section validation. Validation neither saves nor publishes content.
+ */
+export type EmailBlockFragmentValidation = {
+  /**
+   * Plain text derived from this section's HTML.
+   */
+  text: string;
+};
+
+/**
+ * Change block metadata without changing its content or publication state.
+ */
+export type EmailBlockUpdate = {
+  /**
+   * Metadata revision last read. A concurrent change returns 409.
+   */
+  revision: number;
+  /**
+   * New name for the block.
+   */
+  name?: string;
+  /**
+   * Replacement maintenance notes. Send an empty string to clear them.
+   */
+  description?: string;
+  /**
+   * An existing block language. It can change only before the first publication.
+   */
+  source_language?: LanguageTag;
+  /**
+   * Archive or unarchive the block. Archiving retains its content and history.
+   */
+  archived?: boolean;
+};
+
+/**
+ * Copy all current draft languages into a new unpublished block.
+ */
+export type EmailBlockDuplicate = {
+  /**
+   * Source metadata revision last read. A change while copying returns 409.
+   */
+  revision: number;
+  /**
+   * Name for the new block.
+   */
+  name: string;
+};
+
+/**
+ * One language to publish and the draft revision it must still be at.
+ */
+export type EmailBlockPublishLanguage = {
+  language: LanguageTag;
+  /**
+   * Draft revision last read. A newer saved draft returns 409.
+   */
+  revision: number;
+};
+
+/**
+ * Publish the current drafts of the named languages. They go live together or not at all.
+ */
+export type EmailBlockPublish = {
+  /**
+   * Languages to publish, each with the draft revision last read.
+   */
+  languages: Array<EmailBlockPublishLanguage>;
+  /**
+   * Publish even though live templates that use this block will start requiring inputs this publication adds. Without it, such a publication returns 409 naming the inputs and templates.
+   */
+  confirm?: boolean;
+};
+
+export type EmailBlockSubmissionId = string;
+
+/**
+ * Where a block change is in its lifecycle. `published` means its revisions are live. New values may be added; treat an unknown value as not yet live.
+ */
+export type EmailBlockSubmissionStatus = "published" | (string & {});
+
+export type EmailBlockRevisionId = string;
+
+/**
+ * One language included in a block change.
+ */
+export type EmailBlockSubmissionLanguage = {
+  language: LanguageTag;
+  /**
+   * Draft revision this snapshot was taken from.
+   */
+  draft_revision: number;
+  /**
+   * Immutable snapshot of the draft at that revision.
+   */
+  candidate_revision_id: EmailBlockRevisionId;
+};
+
+/**
+ * A revision that became the published content of one block language.
+ */
+export type EmailBlockPublishedRevision = {
+  language: LanguageTag;
+  id: EmailBlockRevisionId;
+  /**
+   * Publication number within this block language.
+   */
+  version_number: number;
+};
+
+/**
+ * One block change put forward for publication. A change that needs no review is recorded already published.
+ */
+export type EmailBlockSubmission = {
+  id: EmailBlockSubmissionId;
+  block_id: EmailBlockId;
+  status: EmailBlockSubmissionStatus;
+  /**
+   * Each included language, the draft revision it was taken from, and the snapshot frozen for it.
+   */
+  languages: Array<EmailBlockSubmissionLanguage>;
+  /**
+   * The revisions that became live when this change was published.
+   */
+  published_revisions: Array<EmailBlockPublishedRevision>;
+  published_at: string;
+  created_at: string;
+};
+
+/**
+ * How this language is edited. `html` content is written as HTML and can be changed through the API, CLI and MCP. `visual` content is built in the Bird dashboard's visual editor; outside the dashboard, a visual section can still be copied by duplicating its block or restoring a published revision. The mode follows from the stored content and cannot be set directly. New values may be added; treat an unknown value as content you cannot edit through the API, CLI or MCP.
+ */
+export type EmailAuthoringMode = "visual" | "html" | (string & {});
+
+export type EmailBlockLanguageFields = {
+  language: LanguageTag;
+  /**
+   * Draft revision to send back when saving or publishing this language, as last returned. It is not a publication number; a published revision is a separate record numbered by `version_number`.
+   */
+  revision: number;
+  authoring_mode: EmailAuthoringMode;
+  /**
+   * Published source-language revision used for this translation. Omitted when untracked.
+   */
+  source_revision_id?: EmailBlockRevisionId;
+  /**
+   * Current published revision for this exact language. Omitted before publication.
+   */
+  published_revision_id?: EmailBlockRevisionId;
+};
+
+/**
+ * One language's draft revision and publication references, without its content.
+ */
+export type EmailBlockLanguageSummary = EmailBlockLanguageFields & Timestamps;
+
+/**
+ * All block languages, ordered by language tag. A block holds at most 25 languages.
+ */
+export type EmailBlockLanguageList = {
+  data: Array<EmailBlockLanguageSummary>;
+};
+
+/**
+ * Editable content for one exact language. No language fallback is applied.
+ */
+export type EmailBlockLanguage = EmailBlockLanguageFields & {
+  fragment: EmailBlockFragment;
+} & Timestamps;
+
+export type EmailBlockLanguageUpsert = unknown & {
+  /**
+   * Draft revision last read, or zero to create a missing language. A concurrent change returns 409.
+   */
+  revision: number;
+  fragment?: EmailBlockFragment;
+  /**
+   * Published source-language revision this translation was made from. Accepted with `fragment` only; leaving it out clears the reference.
+   */
+  source_revision_id?: EmailBlockRevisionId;
+  /**
+   * Published revision of this language to copy back into the draft, sent instead of `fragment`. Copying never publishes.
+   */
+  from_revision_id?: EmailBlockRevisionId;
+};
+
+/**
+ * Field used to order a block language's published revisions.
+ */
+export type EmailBlockRevisionSortField = "version_number";
+
+export type EmailBlockRevisionFields = {
+  id: EmailBlockRevisionId;
+  /**
+   * Publication number within this block language. A draft's `revision` is the value to send back when saving, not a publication number.
+   */
+  version_number: number;
+  /**
+   * Format used to save and render this section: 2 for a section written as HTML, 1 for one built in the Bird dashboard's visual editor.
+   */
+  serializer_version: number;
+  authoring_mode: EmailAuthoringMode;
+  /**
+   * Source-language revision used for this translation. Omitted when untracked.
+   */
+  source_revision_id?: EmailBlockRevisionId;
+  /**
+   * Who published this revision.
+   */
+  published_by: Actor;
+  published_at: string;
+  created_at: string;
+};
+
+/**
+ * A retained publication without its content.
+ */
+export type EmailBlockRevisionSummary = EmailBlockRevisionFields;
+
+/**
+ * A page of published block revisions.
+ */
+export type EmailBlockRevisionList = {
+  data: Array<EmailBlockRevisionSummary>;
+} & ListEnvelopeWithTotal;
+
+/**
+ * Retained published content for one exact block language.
+ */
+export type EmailBlockRevision = EmailBlockRevisionFields & {
+  fragment: EmailBlockFragment;
+};
+
+/**
  * Whether the template is for `transactional` email or `marketing` email.
  */
 export type EmailTemplateCategory = "transactional" | "marketing";
@@ -23025,10 +23402,42 @@ export type EmailTemplateList = {
 export type EmailTemplateSourceWrite = "html";
 
 /**
+ * The shared block one occurrence in a template language links. The link follows the block's latest published content in that language.
+ */
+export type EmailTemplateSharedBlockBinding = {
+  block_id: EmailBlockId;
+};
+
+/**
+ * Reusable block links in one template language, keyed by occurrence UUID. Each key matches one HTML comment marker `bird:shared-block:UUID` in the language's HTML. The template language selects the block language, and a link follows the block's latest publication in that language.
+ */
+export type EmailTemplateSharedBlocks = {
+  /**
+   * Format of these shared section references.
+   */
+  version: number;
+  /**
+   * Block references keyed by occurrence UUID, with up to 100 occurrences per language.
+   */
+  bindings: {
+    [key: string]: EmailTemplateSharedBlockBinding;
+  };
+};
+
+/**
  * One language's content for an email template. Each language carries its own subject, preview text and bodies, so a translation can differ in wording and length from every other language without affecting them.
  *
  */
 export type EmailTemplateLanguageContent = {
+  /**
+   * Whether this language links reusable blocks. On ordinary reads, the HTML shows each linked block's current published content and changes when a linked block is published; copying it to a new template creates independent content. Read the language with `authoring=true` for its HTML with block markers and its `shared_blocks`.
+   *
+   */
+  readonly has_shared_blocks?: boolean;
+  /**
+   * The language's block links. Returned only by `authoring=true` reads.
+   */
+  readonly shared_blocks?: EmailTemplateSharedBlocks;
   /**
    * The email subject line for this language.
    */
@@ -23809,7 +24218,7 @@ export type EmailTemplateVersionSummary = {
   /**
    * Input definitions this version uses, including caller parameters and reserved Bird inputs. An entry with `system` false is yours to send in `template.parameters`. An entry with `system` true names a reserved Bird key; supported paths receive Bird values. A draft can also report unsupported reserved paths, including bare `bird`, whose `constraint` explains that no Bird value fills them. Correct these paths before publishing. Naming a reserved Bird key in a send is rejected with a `422`.
    *
-   * The list combines all the languages, because languages do not have to use the same inputs: if the English body uses `discount_code` and the French body uses `shipping_date`, both appear here. A send requires values only for the caller parameters referenced by its resolved language. Preview each language to see its inputs. Extra parameters are ignored; omitting a caller parameter referenced by the resolved language returns a `422` naming it.
+   * The list combines all the languages, because languages do not have to use the same inputs: if the English body uses `discount_code` and the French body uses `shipping_date`, both appear here. A send requires values only for the caller parameters referenced by its resolved language. Preview each language to see its inputs. In the version list, a published version reports only its own inputs, not those of sections it links from reusable blocks; the single-version read includes them. Extra parameters are ignored; omitting a caller parameter referenced by the resolved language returns a `422` naming it.
    *
    */
   readonly variables: Array<TemplateVariable>;
@@ -23985,6 +24394,11 @@ export type EmailTemplateLanguage = {
    */
   readonly revision: number;
   /**
+   * How this language is edited, derived from what it stores. `visual`: it keeps a document from the Bird dashboard's visual editor. A request that would add, move or remove its linked blocks is refused, and so is one that would replace its body while it links blocks; open the template's `editor_url` instead. Subject and preview text stay editable. While it links no blocks, a full save without `editor_state` replaces its visual design with your HTML, and a partial update that changes `html` or `text` keeps the design, so the language stays `visual` and the visual editor still shows the design rather than your HTML. `html`: it is edited as HTML, and blocks are linked with HTML comment markers of the form `bird:shared-block:OCCURRENCE_UUID` and `shared_blocks`. It changes only when a save keeps or drops the visual editor's document.
+   *
+   */
+  readonly authoring_mode: EmailAuthoringMode;
+  /**
    * A hash over this language's content, prefixed with the algorithm that produced it (`sha256:`), so the algorithm can change without the field becoming ambiguous. It tells you whether a language differs without transferring the content, and is comparable only within one version of this API. Null for a language saved before fingerprints were recorded.
    *
    */
@@ -24008,6 +24422,16 @@ export type EmailTemplateLanguage = {
  */
 export type EmailTemplateLanguageUpsert = {
   /**
+   * Links reusable blocks into this language. Send the complete language with it: `html` with one HTML comment `bird:shared-block:OCCURRENCE_UUID` per binding, placed where a section can stand (between block-level elements, not inside a paragraph or a table row), empty `text`, and the `revision` you read (0 to create the language). Key each binding by a lowercase UUID for that occurrence. A newly linked block must be unarchived and published in this exact language. Keep an occurrence's UUID to move it, use a new one to add another, and delete both its marker and its binding to remove it. To remove every link, send HTML without markers and empty `bindings`. A language edited in the Bird dashboard's visual editor cannot be saved this way from outside the dashboard (`E04108`).
+   *
+   */
+  shared_blocks?: EmailTemplateSharedBlocks;
+  /**
+   * Confirms replacing the language's custom plain-text body with text derived from the linked HTML, in the same save that links its first block. Requires `shared_blocks` and the language `revision`.
+   *
+   */
+  replace_custom_text?: boolean;
+  /**
    * The email subject line. It may be empty in a draft but is required to publish.
    */
   subject: string;
@@ -24017,7 +24441,8 @@ export type EmailTemplateLanguageUpsert = {
    */
   preview_text?: string;
   /**
-   * The HTML body for this language.
+   * The HTML body for this language. On a language that links blocks, a save without `shared_blocks` is refused (`E04109`); read it with `authoring=true` for the HTML with its block markers first.
+   *
    */
   html?: string;
   /**
@@ -24043,6 +24468,7 @@ export type EmailTemplateRef = string;
  *
  */
 export type EmailTemplateLanguageSaved = {
+  readonly shared_blocks?: EmailTemplateSharedBlocks;
   /**
    * The language that was saved, in its canonical form. Send a tag in any casing and this reports the form the template stores.
    *
@@ -24053,6 +24479,11 @@ export type EmailTemplateLanguageSaved = {
    *
    */
   readonly revision: number;
+  /**
+   * How this language is edited, derived from what it stores. `visual`: it keeps a document from the Bird dashboard's visual editor. A request that would add, move or remove its linked blocks is refused, and so is one that would replace its body while it links blocks; open the template's `editor_url` instead. Subject and preview text stay editable. While it links no blocks, a full save without `editor_state` replaces its visual design with your HTML, and a partial update that changes `html` or `text` keeps the design, so the language stays `visual` and the visual editor still shows the design rather than your HTML. `html`: it is edited as HTML, and blocks are linked with HTML comment markers of the form `bird:shared-block:OCCURRENCE_UUID` and `shared_blocks`. It changes only when a save keeps or drops the visual editor's document.
+   *
+   */
+  readonly authoring_mode: EmailAuthoringMode;
   /**
    * The draft's new revision. Saving a language moves it, so any template update you make next must send this value instead of the revision you read before the save.
    *
@@ -24109,11 +24540,12 @@ export type EmailTemplateLanguageUpdate = {
    */
   preview_text?: string | null;
   /**
-   * A new HTML body for this language.
+   * A new HTML body for this language. Refused on a language that links blocks; change its body with a full save that includes `shared_blocks`.
+   *
    */
   html?: string;
   /**
-   * A new plain-text body for this language. Send null to clear it, and a plain-text alternative is derived from the HTML when you submit.
+   * A new plain-text body for this language. Send null to clear it, and a plain-text alternative is derived from the HTML when you submit. Refused on a language that links blocks, which always derives its text.
    *
    */
   text?: string | null;
@@ -26318,12 +26750,12 @@ export type EventEmailBase = {
    */
   recipient_role: RecipientRole;
   /**
-   * Tags provided on the send request, echoed on every event for the send so you can route and correlate without an extra lookup. Null when the send carried no tags.
+   * Tags from the send request when available. Null when no tags were supplied. On email.unsubscribed and email.list_unsubscribed from Bird unsubscribe links, null for individual sends and when broadcast context is unavailable. Correlate using workspace_id and email_id even when tags are null.
    *
    */
   tags: Array<Tag> | null;
   /**
-   * The metadata object provided on the send request, echoed on every event for the send so you can correlate events with your own records. Null when the send carried no metadata.
+   * Metadata from the send request when available. Null when no metadata was supplied. On email.unsubscribed and email.list_unsubscribed from Bird unsubscribe links, null for individual sends and when broadcast context is unavailable. Keep a mapping from workspace_id and email_id to your own records for correlation.
    *
    */
   metadata: {
@@ -29746,7 +30178,7 @@ export type NumbersOrderId = string;
 
 export type NumbersOrder = {
   /**
-   * Identifier of this purchase order.
+   * Identifier of this number order.
    */
   readonly id: NumbersOrderId;
   /**
@@ -29760,7 +30192,7 @@ export type NumbersOrder = {
   readonly number_type: NumberType;
   readonly status: NumbersOrderStatus;
   /**
-   * Identifier of the number this order produced, set when `status` is `completed`. Pass it as `number_id` to `GET /v1/numbers/{number_id}` or `DELETE /v1/numbers/{number_id}`. `null` until the order completes.
+   * Identifier of the workspace allocation associated with this completed order. Multiple orders can refer to the same allocation. This historical association remains after release; `GET /v1/numbers/{number_id}` returns its current holding state and can return not found after release. `null` until the order completes.
    *
    */
   readonly number_id?: NumbersDedicatedAllocationId | null;
@@ -29770,7 +30202,7 @@ export type NumbersOrder = {
    */
   readonly failure_reason?: string | null;
   /**
-   * When the purchase completed and the number became owned (status completed). `null` for orders still in progress or failed.
+   * When this order completed (status completed). Completion records the associated allocation and does not establish its current holding state. `null` for orders still in progress or failed.
    *
    */
   readonly completed_at?: string | null;
@@ -30039,7 +30471,7 @@ export type VoiceTrunkCore = {
    */
   readonly ineligible_api_key_ids: Array<ApiKeyId>;
   /**
-   * The Digest hash algorithms this trunk offers, in the order they are offered. We send one challenge line per algorithm and your PBX answers with the first it supports, so the order decides what most equipment picks. Always populated: a trunk with no explicit setting reports the default, `["SHA-256", "MD5"]`. A trunk answering with an algorithm that is not on this list is rejected, so narrowing the list also narrows what the trunk accepts. Replace `digest_algorithms` through the trunk update operation.
+   * The Digest hash algorithms this trunk offers, in the order they are offered. We send one challenge line per algorithm and your PBX answers with the first it supports, so the order decides what most equipment picks. Always populated: a trunk with no explicit setting reports the default, `["SHA-256", "MD5"]`. The list governs clients that authenticate with an API key: their answer with an algorithm that is not on it is rejected, so narrowing the list also narrows what the trunk accepts from them. Session credentials, which the dashboard phone uses and `POST /v1/voice/session-credentials` creates, are the exception: with `session_credentials_enabled`, the challenge always ends with an MD5 line, after the list in its own order, and a valid session credential is accepted with MD5 or SHA-256. An API-key answer with that extra MD5 is still rejected. Replace `digest_algorithms` through the trunk update operation.
    *
    */
   readonly digest_algorithms: Array<VoiceSipDigestAlgorithm>;
@@ -30077,10 +30509,20 @@ export type VoiceTrunkCore = {
 export type VoiceTrunkMediaEncryption = "off" | "preferred" | "required";
 
 /**
+ * A Bird media site.
+ */
+export type VoiceTrunkMediaSite = "ap1" | "eu1" | "us1";
+
+/**
  * How the trunk carries call audio. Set it through the trunk update operation.
  */
 export type VoiceTrunkMedia = {
   encryption: VoiceTrunkMediaEncryption;
+  /**
+   * The sites the trunk-facing leg may use for call audio. The trunk's home site is always included. Carrier availability can further limit those sites; a separate carrier-facing leg may use another site. A trunk whose media sites aren't set reports its home site; until they're saved, Bird may also anchor audio at an exit gateway's or a bridged call's site.
+   *
+   */
+  sites: Array<VoiceTrunkMediaSite>;
 };
 
 export type VoiceTrunk = VoiceTrunkCore & {
@@ -30100,6 +30542,11 @@ export type VoiceTrunkMediaCreate = {
    *
    */
   encryption?: VoiceTrunkMediaEncryption;
+  /**
+   * The sites this trunk may use for call audio, including its home site. Omit this field to allow every media site.
+   *
+   */
+  sites?: Array<VoiceTrunkMediaSite>;
 };
 
 export type VoiceTrunkCreate = {
@@ -30124,7 +30571,7 @@ export type VoiceTrunkCreate = {
   media_bypass?: boolean;
   media?: VoiceTrunkMediaCreate;
   /**
-   * The Digest hash algorithms to offer, in the order they should be offered. Omit this to use the default of `["SHA-256", "MD5"]`, which suits most equipment. Send `["MD5"]` for a PBX that only implements MD5 and rejects or ignores a challenge offering SHA-256 first. This can be changed later without re-issuing credentials.
+   * The Digest hash algorithms to offer, in the order they should be offered. Omit this to use the default of `["SHA-256", "MD5"]`, which suits most equipment. Send `["MD5"]` for a PBX that only implements MD5 and rejects or ignores a challenge offering SHA-256 first. This governs clients that authenticate with an API key. Session credentials, including the dashboard phone's, are always offered MD5 as well and accepted with MD5 or SHA-256. This can be changed later without re-issuing credentials.
    *
    */
   digest_algorithms?: Array<VoiceSipDigestAlgorithm>;
@@ -30136,10 +30583,15 @@ export type VoiceTrunkCreate = {
 };
 
 /**
- * A change to how the trunk encrypts call audio.
+ * A change to how the trunk carries call audio.
  */
 export type VoiceTrunkMediaUpdate = {
-  encryption: VoiceTrunkMediaEncryption;
+  encryption?: VoiceTrunkMediaEncryption;
+  /**
+   * Replace the permitted media sites. The list must include the trunk's home site. Omit this field to keep the current sites.
+   *
+   */
+  sites?: Array<VoiceTrunkMediaSite>;
 };
 
 export type VoiceTrunkIpaclCreate = {
@@ -30196,7 +30648,7 @@ export type VoiceTrunkUpdate = {
    */
   allowed_api_key_ids?: Array<ApiKeyId>;
   /**
-   * Replaces the Digest hash algorithms this trunk offers, in the order they should be offered. Send `["MD5"]` for a PBX that only implements MD5 and rejects or ignores a challenge offering SHA-256 first. Send an empty array to return to the default of `["SHA-256", "MD5"]`. The offer is never empty, because a trunk that offered nothing could not be authenticated at all. Narrowing the list also narrows what the trunk accepts: an answer using an algorithm no longer offered is rejected. Takes effect on the next call setup; no credential is re-issued. Omit the field to leave the offer unchanged.
+   * Replaces the Digest hash algorithms this trunk offers, in the order they should be offered. Send `["MD5"]` for a PBX that only implements MD5 and rejects or ignores a challenge offering SHA-256 first. Send an empty array to return to the default of `["SHA-256", "MD5"]`. The offer is never empty, because a trunk that offered nothing could not be authenticated at all. The list governs clients that authenticate with an API key, and narrowing it also narrows what the trunk accepts from them: an answer using an algorithm no longer offered is rejected. Session credentials, including the dashboard phone's, are always offered MD5 as well and accepted with MD5 or SHA-256. Takes effect on the next call setup; no credential is re-issued. Omit the field to leave the offer unchanged.
    *
    */
   digest_algorithms?: Array<VoiceSipDigestAlgorithm>;
@@ -34212,6 +34664,11 @@ export type EmailBroadcastFundingHoldWritable = {
 
 export type EmailBroadcastWritable = {
   /**
+   * The broadcast's automatic seeding choice, or null when a seed test starts only from a contact at the workspace's trigger address in the audience. Returned on single-broadcast reads and on create and update responses to callers with Inbox Insights read and contact read permission. Not included in lists.
+   *
+   */
+  automatic_seeding?: EmailBroadcastAutomaticSeeding | null;
+  /**
    * The address this broadcast sends from. `name` is filled in when the broadcast was given a display name to send under. Left out on a draft that has not picked a sender yet.
    */
   from?: EmailAddress;
@@ -37233,6 +37690,163 @@ export type EmailCompetitiveVolumeSeriesWritable = {
 };
 
 /**
+ * A reusable email section with independently editable languages.
+ */
+export type EmailBlockWritable = {
+  id: EmailBlockId;
+  /**
+   * Name for people choosing the block, such as when linking it into a template.
+   */
+  name: string;
+  /**
+   * Optional notes for people maintaining the block. Omitted when empty.
+   */
+  description?: string;
+  source_language: LanguageTag;
+  /**
+   * Metadata revision to send when editing or duplicating this block.
+   */
+  revision: number;
+  /**
+   * Who created the block. A duplicate is created by whoever duplicated it.
+   */
+  created_by: ActorWritable;
+  /**
+   * Present when the block is archived. Retained published content remains readable.
+   */
+  archived_at?: string;
+};
+
+/**
+ * A page of blocks.
+ */
+export type EmailBlockListWritable = {
+  data: Array<EmailBlockWritable>;
+} & ListEnvelopeWithTotal;
+
+/**
+ * One language included in a block change.
+ */
+export type EmailBlockSubmissionLanguageWritable = {
+  language: LanguageTag;
+  /**
+   * Draft revision this snapshot was taken from.
+   */
+  draft_revision: number;
+  /**
+   * Immutable snapshot of the draft at that revision.
+   */
+  candidate_revision_id: EmailBlockRevisionId;
+};
+
+/**
+ * A revision that became the published content of one block language.
+ */
+export type EmailBlockPublishedRevisionWritable = {
+  language: LanguageTag;
+  id: EmailBlockRevisionId;
+  /**
+   * Publication number within this block language.
+   */
+  version_number: number;
+};
+
+/**
+ * One block change put forward for publication. A change that needs no review is recorded already published.
+ */
+export type EmailBlockSubmissionWritable = {
+  id: EmailBlockSubmissionId;
+  block_id: EmailBlockId;
+  status: EmailBlockSubmissionStatus;
+  /**
+   * Each included language, the draft revision it was taken from, and the snapshot frozen for it.
+   */
+  languages: Array<EmailBlockSubmissionLanguageWritable>;
+  /**
+   * The revisions that became live when this change was published.
+   */
+  published_revisions: Array<EmailBlockPublishedRevisionWritable>;
+  published_at: string;
+  created_at: string;
+};
+
+export type EmailBlockLanguageFieldsWritable = {
+  language: LanguageTag;
+  /**
+   * Draft revision to send back when saving or publishing this language, as last returned. It is not a publication number; a published revision is a separate record numbered by `version_number`.
+   */
+  revision: number;
+  /**
+   * Published source-language revision used for this translation. Omitted when untracked.
+   */
+  source_revision_id?: EmailBlockRevisionId;
+  /**
+   * Current published revision for this exact language. Omitted before publication.
+   */
+  published_revision_id?: EmailBlockRevisionId;
+};
+
+/**
+ * One language's draft revision and publication references, without its content.
+ */
+export type EmailBlockLanguageSummaryWritable =
+  EmailBlockLanguageFieldsWritable;
+
+/**
+ * All block languages, ordered by language tag. A block holds at most 25 languages.
+ */
+export type EmailBlockLanguageListWritable = {
+  data: Array<EmailBlockLanguageSummaryWritable>;
+};
+
+/**
+ * Editable content for one exact language. No language fallback is applied.
+ */
+export type EmailBlockLanguageWritable = EmailBlockLanguageFieldsWritable & {
+  fragment: EmailBlockFragment;
+};
+
+export type EmailBlockRevisionFieldsWritable = {
+  id: EmailBlockRevisionId;
+  /**
+   * Publication number within this block language. A draft's `revision` is the value to send back when saving, not a publication number.
+   */
+  version_number: number;
+  /**
+   * Format used to save and render this section: 2 for a section written as HTML, 1 for one built in the Bird dashboard's visual editor.
+   */
+  serializer_version: number;
+  /**
+   * Source-language revision used for this translation. Omitted when untracked.
+   */
+  source_revision_id?: EmailBlockRevisionId;
+  /**
+   * Who published this revision.
+   */
+  published_by: ActorWritable;
+  published_at: string;
+  created_at: string;
+};
+
+/**
+ * A retained publication without its content.
+ */
+export type EmailBlockRevisionSummaryWritable =
+  EmailBlockRevisionFieldsWritable;
+
+/**
+ * A page of published block revisions.
+ */
+export type EmailBlockRevisionListWritable = {
+  data: Array<EmailBlockRevisionSummaryWritable>;
+} & ListEnvelopeWithTotal;
+
+/**
+ * Retained published content for one exact block language.
+ */
+export type EmailBlockRevisionWritable = EmailBlockRevisionFieldsWritable;
+
+/**
  * Where one of the template's languages stands: whether sends are using it, and whether its draft contains an unpublished edit.
  *
  */
@@ -37259,6 +37873,113 @@ export type EmailTemplateListWritable = {
    */
   data: Array<EmailTemplateSummaryWritable>;
 } & ListEnvelope;
+
+/**
+ * One language's content for an email template. Each language carries its own subject, preview text and bodies, so a translation can differ in wording and length from every other language without affecting them.
+ *
+ */
+export type EmailTemplateLanguageContentWritable = {
+  /**
+   * The email subject line for this language.
+   */
+  subject?: string;
+  /**
+   * The line an inbox shows after the subject in the message list, for this language. Leave it out and the inbox shows the opening words of the body instead. A mail client only reads it from the message body, so publishing folds it into the top of the HTML, hidden from view once the message is open; write it here rather than hiding your own copy in the body.
+   *
+   */
+  preview_text?: string;
+  /**
+   * The HTML body for this language.
+   */
+  html?: string;
+  /**
+   * The plain-text body for this language. Omit it and a plain-text alternative is derived from the HTML when you submit.
+   *
+   */
+  text?: string;
+};
+
+/**
+ * Parameters for creating an email template and its initial draft.
+ */
+export type EmailTemplateCreateWritable = {
+  /**
+   * The template's workspace-unique handle, and a stable alternative to the template ID when sending by template. It can contain lowercase letters, numbers, hyphens, and underscores. It is fixed at creation, so pick it deliberately. Two prefixes are rejected: `bird_`, reserved for our built-in templates, and `emt_`, the template ID format, which a slug could never be distinguished from.
+   *
+   */
+  slug: TemplateSlug;
+  /**
+   * The template's display name, shown wherever the template is listed. You can change it any time. It defaults to the slug if you do not set one.
+   *
+   */
+  name?: string;
+  /**
+   * What the template is for, in your own words.
+   */
+  description?: string;
+  category: EmailTemplateCategory;
+  /**
+   * The authoring format the template is written in, fixed at creation.
+   * `html` is finished markup you provide, optionally personalized with
+   * Liquid. Liquid supports variables, filters, and control flow such
+   * as `{% if %}` conditionals and `{% for %}` loops. A few constructs are
+   * rejected when you submit, and the error names exactly what to change:
+   *
+   * - Partial includes (`{% include %}`, `{% render %}`).
+   * - The `increment`, `decrement`, and `ifchanged` tags.
+   * - The `money`, `format_date`, `format_time`, `json`, `inspect`, and `type` filters.
+   * - Comparing against `empty`/`blank` (use `.size == 0` instead).
+   * - Blocks nested far deeper than real email markup needs.
+   *
+   * Broadcast template parameters accept scalar values; arrays and objects are unsupported.
+   * Broadcasts support `{% for %}` over a local collection created with `split`.
+   * Broadcasts without caller-supplied parameters also support literal ranges and
+   * `{% tablerow %}`. When a broadcast uses caller parameters, ranges and
+   * `{% tablerow %}` are unsupported.
+   *
+   */
+  source: EmailTemplateSourceWrite;
+  /**
+   * The initial draft's content, keyed by language tag in BCP-47 form such as
+   * `en` or `pt-BR`. A template holds up to 25 languages, and a send picks one
+   * of them.
+   *
+   * Omit this to create an empty draft and add content later.
+   *
+   * The example's `{{ first_name }}` is a parameter, filled from
+   * `template.parameters` at send time. A `{{ bird.contact.<attribute> }}`
+   * placeholder reads a contact attribute. Broadcasts resolve each audience
+   * contact during preparation; previews use the selected contact or sample
+   * values. Missing attributes use their configured fallbacks, while explicit
+   * empty strings remain empty.
+   *
+   * Public API sends, including batch and scheduled sends, look up each To
+   * address in this workspace when the selected language reads contact
+   * attributes. A missing contact returns `422` (`E04099`), even if Liquid
+   * supplies a default. Each To receives its own personalized email, with Cc
+   * and Bcc copied on each. Resolved values are saved at acceptance for
+   * delivery and later content reads.
+   *
+   */
+  languages?: {
+    [key in LanguageTag]?: EmailTemplateLanguageContentWritable;
+  };
+  /**
+   * The language a send uses when it does not name one, and the last resort when a requested language is not available. It has to be one of the languages you supply. If you leave it out, we default to `en`, unless you supply exactly one language, in which case we use that one instead. So if you supply two or more languages and `en` is not among them, you have to set this yourself.
+   *
+   */
+  default_language?: LanguageTag;
+  /**
+   * What a send does when it asks for a language this template does not carry. Defaults to `fallback` on email.
+   *
+   */
+  on_missing_language?: TemplateOnMissingLanguage;
+  /**
+   * Whether a send has to name a language. Set it to true to reject a send that names none instead of serving the default language. Pair it with `on_missing_language: fail` when every send must pick a language deliberately: on its own, `fail` is bypassed by naming no language at all. A broadcast must select a template language when this is set. Defaults to false.
+   *
+   */
+  language_source_required?: boolean;
+};
 
 export type EmailTemplateWritable = {
   /**
@@ -37313,7 +38034,7 @@ export type EmailTemplateLanguageListWritable = {
  *
  */
 export type EmailTemplateLanguageWritable = {
-  content?: EmailTemplateLanguageContent;
+  content?: EmailTemplateLanguageContentWritable;
 };
 
 /**
@@ -38075,12 +38796,12 @@ export type EventEmailBaseWritable = {
    */
   recipient_role: RecipientRole;
   /**
-   * Tags provided on the send request, echoed on every event for the send so you can route and correlate without an extra lookup. Null when the send carried no tags.
+   * Tags from the send request when available. Null when no tags were supplied. On email.unsubscribed and email.list_unsubscribed from Bird unsubscribe links, null for individual sends and when broadcast context is unavailable. Correlate using workspace_id and email_id even when tags are null.
    *
    */
   tags: Array<Tag> | null;
   /**
-   * The metadata object provided on the send request, echoed on every event for the send so you can correlate events with your own records. Null when the send carried no metadata.
+   * Metadata from the send request when available. Null when no metadata was supplied. On email.unsubscribed and email.list_unsubscribed from Bird unsubscribe links, null for individual sends and when broadcast context is unavailable. Keep a mapping from workspace_id and email_id to your own records for correlation.
    *
    */
   metadata: {
@@ -40384,6 +41105,21 @@ export type EmailCompetitiveRange = 7 | 30 | 90;
  *
  */
 export type EmailCompetitiveTimezone = Timezone;
+
+/**
+ * Block to read or edit.
+ */
+export type EmailBlockId2 = EmailBlockId;
+
+/**
+ * Exact block language as a BCP-47 tag. No fallback is applied.
+ */
+export type EmailBlockLanguageTag = LanguageTag;
+
+/**
+ * Retained published revision to read.
+ */
+export type EmailBlockRevisionId2 = EmailBlockRevisionId;
 
 /**
  * Return eSIMs assigned to this subscriber.
@@ -71487,6 +72223,1196 @@ export type GetEmailCompetitiveVolumeSeriesResponses = {
 export type GetEmailCompetitiveVolumeSeriesResponse =
   GetEmailCompetitiveVolumeSeriesResponses[keyof GetEmailCompetitiveVolumeSeriesResponses];
 
+export type ListEmailBlocksData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Field to sort by. Defaults to `created_at`.
+     */
+    sort?: EmailBlockSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+     */
+    include_total?: boolean;
+    /**
+     * Case-insensitive text to match within the block name.
+     */
+    q?: string;
+    /**
+     * Return only archived blocks when true, or only active blocks when false.
+     */
+    archived?: boolean;
+  };
+  url: "/v1/email/blocks";
+};
+
+export type ListEmailBlocksErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEmailBlocksError =
+  ListEmailBlocksErrors[keyof ListEmailBlocksErrors];
+
+export type ListEmailBlocksResponses = {
+  /**
+   * The blocks on this page, without their content.
+   */
+  200: EmailBlockList;
+};
+
+export type ListEmailBlocksResponse =
+  ListEmailBlocksResponses[keyof ListEmailBlocksResponses];
+
+export type CreateEmailBlockData = {
+  body: EmailBlockCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/email/blocks";
+};
+
+export type CreateEmailBlockErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Request body or message size exceeds the allowed limit
+   */
+  413: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateEmailBlockError =
+  CreateEmailBlockErrors[keyof CreateEmailBlockErrors];
+
+export type CreateEmailBlockResponses = {
+  /**
+   * The created block, with the `revision` to send when updating or duplicating it.
+   */
+  201: EmailBlock;
+};
+
+export type CreateEmailBlockResponse =
+  CreateEmailBlockResponses[keyof CreateEmailBlockResponses];
+
+export type ValidateEmailBlockFragmentData = {
+  body: EmailBlockFragmentValidationRequest;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/email/blocks/validate";
+};
+
+export type ValidateEmailBlockFragmentErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Request body or message size exceeds the allowed limit
+   */
+  413: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type ValidateEmailBlockFragmentError =
+  ValidateEmailBlockFragmentErrors[keyof ValidateEmailBlockFragmentErrors];
+
+export type ValidateEmailBlockFragmentResponses = {
+  /**
+   * The section passed, with the plain text derived from it.
+   */
+  200: EmailBlockFragmentValidation;
+};
+
+export type ValidateEmailBlockFragmentResponse =
+  ValidateEmailBlockFragmentResponses[keyof ValidateEmailBlockFragmentResponses];
+
+export type GetEmailBlockData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Block to read or edit.
+     */
+    block_id: EmailBlockId;
+  };
+  query?: never;
+  url: "/v1/email/blocks/{block_id}";
+};
+
+export type GetEmailBlockErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEmailBlockError = GetEmailBlockErrors[keyof GetEmailBlockErrors];
+
+export type GetEmailBlockResponses = {
+  /**
+   * The block's metadata.
+   */
+  200: EmailBlock;
+};
+
+export type GetEmailBlockResponse =
+  GetEmailBlockResponses[keyof GetEmailBlockResponses];
+
+export type UpdateEmailBlockData = {
+  body: EmailBlockUpdate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Block to read or edit.
+     */
+    block_id: EmailBlockId;
+  };
+  query?: never;
+  url: "/v1/email/blocks/{block_id}";
+};
+
+export type UpdateEmailBlockErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Request body or message size exceeds the allowed limit
+   */
+  413: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateEmailBlockError =
+  UpdateEmailBlockErrors[keyof UpdateEmailBlockErrors];
+
+export type UpdateEmailBlockResponses = {
+  /**
+   * The updated block.
+   */
+  200: EmailBlock;
+};
+
+export type UpdateEmailBlockResponse =
+  UpdateEmailBlockResponses[keyof UpdateEmailBlockResponses];
+
+export type DuplicateEmailBlockData = {
+  body: EmailBlockDuplicate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Block to read or edit.
+     */
+    block_id: EmailBlockId;
+  };
+  query?: never;
+  url: "/v1/email/blocks/{block_id}/duplicate";
+};
+
+export type DuplicateEmailBlockErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Request body or message size exceeds the allowed limit
+   */
+  413: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DuplicateEmailBlockError =
+  DuplicateEmailBlockErrors[keyof DuplicateEmailBlockErrors];
+
+export type DuplicateEmailBlockResponses = {
+  /**
+   * The new block.
+   */
+  201: EmailBlock;
+};
+
+export type DuplicateEmailBlockResponse =
+  DuplicateEmailBlockResponses[keyof DuplicateEmailBlockResponses];
+
+export type PublishEmailBlockData = {
+  body: EmailBlockPublish;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Block to read or edit.
+     */
+    block_id: EmailBlockId;
+  };
+  query?: never;
+  url: "/v1/email/blocks/{block_id}/publish";
+};
+
+export type PublishEmailBlockErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type PublishEmailBlockError =
+  PublishEmailBlockErrors[keyof PublishEmailBlockErrors];
+
+export type PublishEmailBlockResponses = {
+  /**
+   * The publication, with the revisions it made live.
+   */
+  200: EmailBlockSubmission;
+};
+
+export type PublishEmailBlockResponse =
+  PublishEmailBlockResponses[keyof PublishEmailBlockResponses];
+
+export type ListEmailBlockLanguagesData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Block to read or edit.
+     */
+    block_id: EmailBlockId;
+  };
+  query?: never;
+  url: "/v1/email/blocks/{block_id}/languages";
+};
+
+export type ListEmailBlockLanguagesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEmailBlockLanguagesError =
+  ListEmailBlockLanguagesErrors[keyof ListEmailBlockLanguagesErrors];
+
+export type ListEmailBlockLanguagesResponses = {
+  /**
+   * The block's languages, without their content.
+   */
+  200: EmailBlockLanguageList;
+};
+
+export type ListEmailBlockLanguagesResponse =
+  ListEmailBlockLanguagesResponses[keyof ListEmailBlockLanguagesResponses];
+
+export type DeleteEmailBlockLanguageData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Block to read or edit.
+     */
+    block_id: EmailBlockId;
+    /**
+     * Exact block language as a BCP-47 tag. No fallback is applied.
+     */
+    language: LanguageTag;
+  };
+  query?: never;
+  url: "/v1/email/blocks/{block_id}/languages/{language}";
+};
+
+export type DeleteEmailBlockLanguageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteEmailBlockLanguageError =
+  DeleteEmailBlockLanguageErrors[keyof DeleteEmailBlockLanguageErrors];
+
+export type DeleteEmailBlockLanguageResponses = {
+  /**
+   * The language was deleted.
+   */
+  204: void;
+};
+
+export type DeleteEmailBlockLanguageResponse =
+  DeleteEmailBlockLanguageResponses[keyof DeleteEmailBlockLanguageResponses];
+
+export type GetEmailBlockLanguageData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Block to read or edit.
+     */
+    block_id: EmailBlockId;
+    /**
+     * Exact block language as a BCP-47 tag. No fallback is applied.
+     */
+    language: LanguageTag;
+  };
+  query?: never;
+  url: "/v1/email/blocks/{block_id}/languages/{language}";
+};
+
+export type GetEmailBlockLanguageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEmailBlockLanguageError =
+  GetEmailBlockLanguageErrors[keyof GetEmailBlockLanguageErrors];
+
+export type GetEmailBlockLanguageResponses = {
+  /**
+   * The language's draft.
+   */
+  200: EmailBlockLanguage;
+};
+
+export type GetEmailBlockLanguageResponse =
+  GetEmailBlockLanguageResponses[keyof GetEmailBlockLanguageResponses];
+
+export type UpsertEmailBlockLanguageData = {
+  body: EmailBlockLanguageUpsert;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Block to read or edit.
+     */
+    block_id: EmailBlockId;
+    /**
+     * Exact block language as a BCP-47 tag. No fallback is applied.
+     */
+    language: LanguageTag;
+  };
+  query?: never;
+  url: "/v1/email/blocks/{block_id}/languages/{language}";
+};
+
+export type UpsertEmailBlockLanguageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Request body or message size exceeds the allowed limit
+   */
+  413: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpsertEmailBlockLanguageError =
+  UpsertEmailBlockLanguageErrors[keyof UpsertEmailBlockLanguageErrors];
+
+export type UpsertEmailBlockLanguageResponses = {
+  /**
+   * The saved language draft.
+   */
+  200: EmailBlockLanguage;
+};
+
+export type UpsertEmailBlockLanguageResponse =
+  UpsertEmailBlockLanguageResponses[keyof UpsertEmailBlockLanguageResponses];
+
+export type ListEmailBlockRevisionsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Block to read or edit.
+     */
+    block_id: EmailBlockId;
+    /**
+     * Exact block language as a BCP-47 tag. No fallback is applied.
+     */
+    language: LanguageTag;
+  };
+  query?: {
+    /**
+     * Field to sort by. Defaults to `version_number`.
+     */
+    sort?: EmailBlockRevisionSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+     */
+    include_total?: boolean;
+  };
+  url: "/v1/email/blocks/{block_id}/languages/{language}/revisions";
+};
+
+export type ListEmailBlockRevisionsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEmailBlockRevisionsError =
+  ListEmailBlockRevisionsErrors[keyof ListEmailBlockRevisionsErrors];
+
+export type ListEmailBlockRevisionsResponses = {
+  /**
+   * The language's published revisions.
+   */
+  200: EmailBlockRevisionList;
+};
+
+export type ListEmailBlockRevisionsResponse =
+  ListEmailBlockRevisionsResponses[keyof ListEmailBlockRevisionsResponses];
+
+export type GetEmailBlockRevisionData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Block to read or edit.
+     */
+    block_id: EmailBlockId;
+    /**
+     * Exact block language as a BCP-47 tag. No fallback is applied.
+     */
+    language: LanguageTag;
+    /**
+     * Retained published revision to read.
+     */
+    revision_id: EmailBlockRevisionId;
+  };
+  query?: never;
+  url: "/v1/email/blocks/{block_id}/languages/{language}/revisions/{revision_id}";
+};
+
+export type GetEmailBlockRevisionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEmailBlockRevisionError =
+  GetEmailBlockRevisionErrors[keyof GetEmailBlockRevisionErrors];
+
+export type GetEmailBlockRevisionResponses = {
+  /**
+   * The published revision.
+   */
+  200: EmailBlockRevision;
+};
+
+export type GetEmailBlockRevisionResponse =
+  GetEmailBlockRevisionResponses[keyof GetEmailBlockRevisionResponses];
+
 export type ListEmailTemplatesData = {
   body?: never;
   headers?: {
@@ -71587,7 +73513,7 @@ export type ListEmailTemplatesResponse =
   ListEmailTemplatesResponses[keyof ListEmailTemplatesResponses];
 
 export type CreateEmailTemplateData = {
-  body: EmailTemplateCreate;
+  body: EmailTemplateCreateWritable;
   headers?: {
     /**
      * Client-supplied key. On operations supporting request deduplication, a retained
@@ -72773,7 +74699,12 @@ export type GetEmailTemplateLanguageData = {
      */
     language: LanguageTag;
   };
-  query?: never;
+  query?: {
+    /**
+     * Return the HTML with its reusable block markers in place of the blocks' content, plus `shared_blocks`, so a language that links blocks can be saved back with its links intact. Compatibility locations still refer to the HTML with the blocks filled in.
+     */
+    authoring?: boolean;
+  };
   url: "/v1/email/templates/{template_ref}/versions/{version_id}/languages/{language}";
 };
 
@@ -76801,6 +78732,10 @@ export type ListNumbersOrdersData = {
   path?: never;
   query?: {
     /**
+     * Return orders associated with this exact workspace allocation, newest first. Multiple attempts can refer to the same allocation; the newest attempt is not necessarily the order that first assigned it.
+     */
+    number_id?: AllocatedNumberId;
+    /**
      * Return only orders with status `charging`, `ordering`, `pending`, `completed`, or `failed`.
      */
     status?: NumbersOrderStatus;
@@ -76850,6 +78785,11 @@ export type ListNumbersOrdersErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type ListNumbersOrdersError =
@@ -76960,7 +78900,7 @@ export type CreateNumbersOrderError =
 
 export type CreateNumbersOrderResponses = {
   /**
-   * The order completed and the number is now allocated to your workspace. Its status is completed, with number and number_id populated.
+   * The order completed, with number and number_id identifying its associated allocation. Read the number for its current holding state; the order remains completed after release.
    */
   201: NumbersOrder;
   /**
@@ -77024,6 +78964,11 @@ export type GetNumbersOrderErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type GetNumbersOrderError =

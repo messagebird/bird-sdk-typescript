@@ -368,6 +368,31 @@ export const DestinationSuperRegion = {
 export type DestinationSuperRegionValue = (typeof DestinationSuperRegion)[keyof typeof DestinationSuperRegion];
 
 /**
+ * Values of EmailAuthoringMode known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailAuthoringMode = {
+  Html: "html",
+  Visual: "visual",
+} as const;
+
+/** A known EmailAuthoringMode value. */
+export type EmailAuthoringModeValue = (typeof EmailAuthoringMode)[keyof typeof EmailAuthoringMode];
+
+/**
+ * Values of EmailBlockSubmissionStatus known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailBlockSubmissionStatus = {
+  Published: "published",
+} as const;
+
+/** A known EmailBlockSubmissionStatus value. */
+export type EmailBlockSubmissionStatusValue = (typeof EmailBlockSubmissionStatus)[keyof typeof EmailBlockSubmissionStatus];
+
+/**
  * Values of EmailBroadcastParameterProblemCode known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -392,6 +417,9 @@ export const EmailBroadcastParameterProblemCode = {
   RenderBudgetExceeded: "render_budget_exceeded",
   RenderProfileUnsupported: "render_profile_unsupported",
   RenderedEnvelopeInvalid: "rendered_envelope_invalid",
+  SeedExampleValueMissing: "seed_example_value_missing",
+  SeedTestsExhausted: "seed_tests_exhausted",
+  SeedingNotConfigured: "seeding_not_configured",
   SenderUnavailable: "sender_unavailable",
   SensitiveInputUnsupported: "sensitive_input_unsupported",
   TemplateUnavailable: "template_unavailable",
@@ -423,6 +451,7 @@ export type EmailBroadcastParameterProblemPhaseValue = (typeof EmailBroadcastPar
  */
 export const EmailBroadcastParameterProblemSeverity = {
   Error: "error",
+  Warning: "warning",
 } as const;
 
 /** A known EmailBroadcastParameterProblemSeverity value. */

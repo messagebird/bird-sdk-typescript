@@ -7,6 +7,7 @@ import type { APIPromise, RequestOptions } from "../core/result.js";
 export type { EmailTemplateLanguageList };
 export type { EmailTemplateLanguage };
 export type { EmailTemplateLanguageSaved };
+export type EmailTemplatesVersionsLanguagesGetQuery = NonNullable<GetEmailTemplateLanguageData["query"]>;
 export type EmailTemplatesVersionsLanguagesSetParams = NonNullable<UpsertEmailTemplateLanguageData["body"]>;
 export type EmailTemplatesVersionsLanguagesUpdateParams = NonNullable<UpdateEmailTemplateLanguageData["body"]>;
 
@@ -20,7 +21,7 @@ export class EmailTemplatesVersionsLanguagesResource extends Resource {
   }
 
   /**
-   * Read one language's subject and bodies from a template version. The response carries `compatibility`: what the stored HTML uses that mail clients remove, ignore, or render inconsistently, and `compatibility_severity` reducing it to `problem`, `warning`, or `none`.
+   * Read one language's subject and bodies from a template version. The response carries `compatibility`: what the stored HTML uses that mail clients remove, ignore, or render inconsistently, and `compatibility_severity` reducing it to `problem`, `warning`, or `none`. For a language that links reusable blocks, the HTML shows the blocks' current published content; with `authoring` true it carries an HTML comment marker `bird:shared-block:UUID` per link and `shared_blocks` instead, the form `email.templates.versions.languages.set` saves back.
    *
    * @example Read a draft language's HTML back
    * const language = await bird.email.templates.versions.languages.get(
@@ -30,13 +31,13 @@ export class EmailTemplatesVersionsLanguagesResource extends Resource {
    * );
    * console.log(language.content?.html);
    */
-  get(templateRef: string, versionId: string, language: string, options?: RequestOptions): APIPromise<EmailTemplateLanguage> {
+  get(templateRef: string, versionId: string, language: string, query?: EmailTemplatesVersionsLanguagesGetQuery, options?: RequestOptions): APIPromise<EmailTemplateLanguage> {
     return this.call<EmailTemplateLanguage>("GET", options, ({ signal, headers }) =>
-      getEmailTemplateLanguage({ client: this.client, path: { template_ref: templateRef, version_id: versionId, language: language }, headers, signal }));
+      getEmailTemplateLanguage({ client: this.client, path: { template_ref: templateRef, version_id: versionId, language: language }, query, headers, signal }));
   }
 
   /**
-   * Save one language's full content on a template's draft, creating the language if the draft does not have it yet. The response carries `compatibility`: what the saved HTML uses that mail clients remove, ignore, or render inconsistently, each finding naming the pattern, its line and column, and what to use instead. Advisory: the language is saved either way, and `compatibility_severity` of `problem` means part of the content does nothing at all in the clients the finding names.
+   * Save one language's full content on a template's draft, creating the language if the draft does not have it yet. The response carries `compatibility`: what the saved HTML uses that mail clients remove, ignore, or render inconsistently, each finding naming the pattern, its line and column, and what to use instead. Advisory: the language is saved either way, and `compatibility_severity` of `problem` means part of the content does nothing at all in the clients the finding names. To link reusable blocks, send `shared_blocks` with one HTML comment marker `bird:shared-block:UUID` per binding in `html` and the `revision` read with `authoring` true (0 for a new language). A language edited in the Bird dashboard's visual editor refuses this save.
    */
   set(templateRef: string, versionId: string, language: string, params: EmailTemplatesVersionsLanguagesSetParams, options?: RequestOptions): APIPromise<EmailTemplateLanguageSaved> {
     return this.call<EmailTemplateLanguageSaved>("PUT", options, ({ signal, headers }) =>
