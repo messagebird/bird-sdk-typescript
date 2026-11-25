@@ -1035,7 +1035,7 @@ export type EmailBounceStatsWithRates = {
  * - `bounced`: A delivery failure, with its own hard, soft, admin, block, and undetermined sub-types.
  * - `complained`: Post-delivery spam feedback.
  *
- * Each rate is a fraction in the range 0 to 1 and is null when its denominator is zero. `accepted` is reported only where it can be attributed (time buckets and the period summary). Breakdown rows omit it.
+ * Each rate is a fraction and is null when its denominator is zero. `delivery_rate` and `bounce_rate` fall in the range 0 to 1, while event-time `complaint_rate` and `oob_rate` can exceed 1 when late signals outnumber attempts in a narrow window. `accepted` is reported only where it can be attributed (time buckets and the period summary). Breakdown rows omit it.
  *
  */
 export type EmailDeliveryStats = {
@@ -1085,7 +1085,8 @@ export type EmailDeliveryStats = {
    */
   readonly all_bounces: number;
   /**
-   * Share of this scope's delivery attempts that resulted in an out-of-band bounce, computed as `oob_bounces / (delivered + bounced)`. Null when there were no attempts.
+   * Out-of-band bounce events in this scope relative to delivery attempts, computed as `oob_bounces / (delivered + bounced)`. Because out-of-band bounces are attributed by event time as distinct events, a scope can record more of them than it attempted, pushing the rate above 1. Null when there were no attempts.
+   *
    */
   readonly oob_rate: number | null;
   /**
@@ -5071,14 +5072,14 @@ export type EmailMessageContent = {
 /**
  * Where the broadcast itself has got to. This is separate from what happened to individual recipients, which the broadcast's own `sent_count`, `delivered_count`, `bounced_count` and `complained_count` tell you. Those four are fields on the broadcast, not on everything that carries this status, and reading the broadcast's recipients or its events gives the same outcomes one recipient at a time.
  *
- * The send-allowance response includes `can_start` when funding recovery is available. If the field is absent, do not assume the broadcast can wait for funds or resume.
+ * Use `can_start` in the send-allowance response to check whether email limits permit starting. A funding pause keeps the remaining recipients available for resumption; a failed broadcast cannot resume.
  *
  * - `draft`: Created, and not sent or scheduled yet.
  * - `scheduled`: Due to send at `scheduled_at`. You can still edit it, and you can still change the time, right up until sending starts.
  * - `accepted`: Taken for immediate sending. Nothing has gone out yet.
  * - `sending`: On its way. Some recipients have been sent to and some have not.
- * - `waiting_for_funds`: Sending stopped because your balance cannot pay for more email. You can add funds manually or let your existing automatic top-up restore the balance. Bird checks once a minute and continues sending to the remaining recipients when a funding check succeeds before `funding_hold.wait_until`. Otherwise the broadcast becomes `paused`, even if funds arrive after the last check.
- * - `paused`: Sending stopped because your balance cannot pay for more email, and it does not continue by itself. `funding_hold.reason` says why. Add funds, then resume the broadcast, or cancel it.
+ * - `waiting_for_funds`: Sending stopped because your balance cannot pay for more email, or because the next batch would go over an email sending limit (`funding_hold.reason` is `send_limit_reached`). You can add funds manually or let your existing automatic top-up restore the balance. A sending limit allows more email when it resets. Bird checks once a minute and continues sending to the remaining recipients when a check succeeds before `funding_hold.wait_until`. Otherwise the broadcast becomes `paused`, even if funds or allowance arrive after the last check.
+ * - `paused`: Sending stopped for funds or a sending limit, and it does not continue by itself. `funding_hold.reason` says why. Check the balance and add funds if it is still short, or wait for the limit to allow more email, then resume the broadcast, or cancel it.
  * - `sent`: Every recipient has been sent to.
  * - `canceling`: A cancellation is under way and the remaining sends are stopping.
  * - `canceled`: The cancellation finished. Anything already on its way to a recipient when you canceled cannot be pulled back.
@@ -5166,22 +5167,23 @@ export type EmailBroadcastTemplate = {
 };
 
 /**
- * Why sending stopped for funds.
+ * Why sending stopped for funds or a sending limit.
  *
  * - `automatic_top_up`: Sending stopped while automatic top-up was active. Sending can continue automatically when a funding check succeeds before `wait_until`.
  * - `funds_required`: Sending stopped because your balance cannot pay for more email. While `waiting_for_funds`, a manual or automatic top-up can restart sending before `wait_until`. If the broadcast is `paused`, add funds if needed, then resume it.
  * - `wait_expired`: Status is `paused`. The automatic wait ended before sending continued. Add funds if needed, then resume the broadcast.
+ * - `send_limit_reached`: Sending stopped because the next batch would go over one of your organization's email sending limits, such as its daily limit. While `waiting_for_funds`, Bird checks once a minute and continues sending if the limit allows the next batch before `wait_until`, such as after the daily limit resets at midnight UTC. If the broadcast is `paused`, the limit did not allow sending before `wait_until`. Resume it once the limit allows more email, or cancel it.
  *
  */
 export type EmailBroadcastFundingHoldReason =
-  "automatic_top_up" | "funds_required" | "wait_expired";
+  "automatic_top_up" | "funds_required" | "wait_expired" | "send_limit_reached";
 
 /**
- * Why sending stopped for funds and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.
+ * Why sending stopped for funds or a sending limit, and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.
  *
- * The send-allowance response includes `can_start` when waiting and resuming are available. If `can_start` is absent, do not assume a top-up can recover a broadcast or that a failed broadcast can resume.
+ * For a funds hold, add funds during the wait to let sending continue automatically. After the broadcast pauses, check the balance and add funds if it is still short, then resume it explicitly. For `send_limit_reached`, adding funds does not help: sending continues when the limit allows more email, and after a pause you resume it once it does. Resume is refused while the next batch still cannot be paid for or would go over a sending limit. A failed broadcast cannot resume.
  *
- * Each interruption can wait up to 20 minutes for funds. Checks, refused batches and partial top-ups during the same interruption do not extend its deadline. Automatic continuation or an explicit resume clears the hold; if sending later stops for funds again, a new 20-minute wait begins.
+ * Each interruption can wait up to 20 minutes for funds. An interruption for a sending limit (`send_limit_reached`) waits until 10 minutes after the next midnight UTC, when the daily limit resets. Checks, refused batches and partial top-ups during the same interruption do not extend its deadline. Automatic continuation or an explicit resume clears the hold; if sending later stops again, a new wait begins.
  *
  */
 export type EmailBroadcastFundingHold = {
@@ -5415,22 +5417,22 @@ export type EmailBroadcast = {
    */
   readonly next?: Array<NextAction>;
   /**
-   * Why the broadcast failed. Set when `status` is `failed`, and `null` the rest of the time.
+   * Why the broadcast failed. Set when `status` is `failed`, and `null` the rest of the time. A failed broadcast cannot be sent again; once the cause is fixed, create a new broadcast.
    *
    * - `empty_audience`: There was nobody to send to. Either the audience has no members, or every address in it is suppressed.
    * - `audience_unavailable`: The audience no longer exists, so there was nothing to resolve.
    * - `content_invalid`: The broadcast could not be set up to send. `failure_detail` explains what went wrong. It is one of these:
-   *   - The broadcast has no template, or the template it uses no longer exists. Choose an existing template and send the broadcast again.
+   *   - The broadcast has no template, or the template it uses no longer exists. Choose an existing template for the new broadcast.
    *   - The template has no published version, or its published version has no subject and no body. Publish the template, or add content and publish it.
    *   - The template uses a loop or reads a value that a broadcast cannot provide. Remove it, or use a contact property instead, then publish the template again.
-   *   - The template requires a language, but the broadcast has not selected one. Set `template.language` to one of the template's languages and send the broadcast again.
+   *   - The template requires a language, but the broadcast has not selected one. Set `template.language` on the new broadcast to one of the template's languages.
    *   - The selected language is not available on the published template version. Choose one of that version's languages, or publish a version that includes the selected language.
    *   - The sending domain is no longer verified. Verify the domain again.
    *   - The configured IP pool has no usable IP address.
    *   - We could not hand the prepared message to the delivery system. This is a problem on our side.
    * - `insufficient_funds`: There was not enough in the workspace balance to pay for the send.
    * - `quota_exceeded`: The send would have gone past your organization's daily or monthly email allowance, whichever runs out first. This can happen when the broadcast is being prepared, or partway through sending if the remaining recipients no longer fit. `failure_detail` gives you the count and the limit.
-   * - `internal_error`: Something went wrong on our side. Retry, and open a support ticket if it keeps happening.
+   * - `internal_error`: Something went wrong on our side. Open a support ticket if it keeps happening.
    * - `workspace_suspended`: The workspace is suspended, so the broadcast stopped sending. Recipients not yet sent to are not sent to, even after reactivation. Contact Bird support to reactivate the workspace.
    *
    */
@@ -5859,23 +5861,13 @@ export type EmailBroadcastCountAllowance = {
 };
 
 /**
- * When returned in the send-allowance response, this describes what a broadcast does if your balance runs out while it is sending. Recipients already sent to are not affected either way.
- *
- * - `wait_for_top_up`: The broadcast waits up to 20 minutes for a manual or automatic top-up. It checks once a minute and continues by itself when the insufficient-funds restriction clears, then pauses if the wait ends. Waiting does not change your automatic top-up settings or initiate a payment.
- * - `pause`: The broadcast pauses until you add funds and resume it.
- *
- */
-export type EmailBroadcastInsufficientFundsBehavior =
-  "wait_for_top_up" | "pause";
-
-/**
  * The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.
  *
  * The organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.
  *
- * Servers that support funding recovery return `can_start`; callers with billing read access also receive `on_insufficient_funds`. If `can_start` is absent, use `allowed` to check the current allowance and do not assume automatic waiting or resumability. An absent field is different from `can_start: false`, which explicitly says the broadcast cannot start.
+ * Use `can_start` to check whether the email limits let this broadcast start. If the balance runs out during sending, the broadcast waits up to 20 minutes and can continue automatically if enough funds become available during that wait. Otherwise it pauses until you resume it. It checks for funds once a minute. This does not enable automatic top-up or initiate a payment.
  *
- * `limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit. `on_insufficient_funds` says what happens if the balance runs out mid-send. Like `limit_reason`, it is present only when you have `org:billing` read access.
+ * `limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit.
  *
  */
 export type EmailBroadcastSendQuota = {
@@ -5889,7 +5881,7 @@ export type EmailBroadcastSendQuota = {
    *
    * Partially covered broadcasts send in whole batches. This count is rounded down to a batch boundary and can be lower than `remaining`. Read this value directly instead of calculating it from `limit` and `remaining`.
    *
-   * A value of 0 means no recipients are currently covered. This happens if the audience exceeds a full daily or funded monthly limit, if a temporary funding restriction blocks sending, or if the remaining allowance cannot cover a batch. When `can_start` is present, use it to decide whether a balance-limited broadcast can start and wait for funds. If it is absent, a zero allowance does not provide a way to send.
+   * A value of 0 means no recipients are currently covered. This happens if the audience exceeds a full daily or funded monthly limit, if a temporary funding restriction blocks sending, or if the remaining allowance cannot cover a batch. Use `can_start` to decide whether a broadcast with insufficient funds can start and wait for funds.
    *
    */
   readonly allowed: number;
@@ -5907,7 +5899,7 @@ export type EmailBroadcastSendQuota = {
   /**
    * When usage resets to 0 for the email limit identified by `limited_by`, evaluated at `send_at`, or now if you omit it.
    *
-   * A broadcast sent before this time uses the same window and the allowance left after other sends. A broadcast sent at or after this time uses a new window. If `recipients` exceeds a full daily or funded monthly limit, the send is rejected in any window with that limit. When `limit_reason` is `unfunded`, the reported `limit` can instead be a temporary funding restriction; use `can_start`, when present, to determine whether the broadcast can start and wait for funds. Pass the later time as `send_at` to check whether the other email limit still restricts the send.
+   * A broadcast sent before this time uses the same window and the allowance left after other sends. A broadcast sent at or after this time uses a new window. If `recipients` exceeds a full daily or funded monthly limit, the send is rejected in any window with that limit. When `limit_reason` is `unfunded`, the reported `limit` can instead be a temporary funding restriction; use `can_start` to determine whether the broadcast can start and wait for funds. Pass the later time as `send_at` to check whether the other email limit still restricts the send.
    *
    * Omitted when no email limit restricts the send, when the reset is at or before `send_at`, or when the billing period has ended and the next one has not started.
    *
@@ -5915,14 +5907,13 @@ export type EmailBroadcastSendQuota = {
   readonly resets_at?: string;
   readonly limit_reason?: EmailSendAllowanceLimitReason;
   readonly broadcasts?: EmailBroadcastCountAllowance;
-  readonly on_insufficient_funds?: EmailBroadcastInsufficientFundsBehavior;
   /**
-   * When present, whether the organization's email limits let this broadcast start at `send_at`, or now if you omit it. This ignores a temporary funding restriction, including exhausted included volume when paid overage is available. It still checks daily limits and the monthly limit that applies after funding is restored.
+   * Whether the organization's email limits let this broadcast start at `send_at`, or now if you omit it. This ignores a temporary funding restriction, including exhausted included volume when paid overage is available. It still checks daily limits and the monthly limit that applies after funding is restored.
    *
    * It is `false` when no recipient fits the daily or funded monthly limits, including when the audience exceeds a full daily or funded monthly limit, or when usage has exhausted either limit. The response field `remaining` can instead reflect the temporary funding restriction: with `limit_reason: unfunded`, `remaining: 0` can accompany `can_start: true` if those daily and funded monthly limits allow sending. The broadcast can then start and wait for funds. A `true` value does not reserve allowance or promise that every recipient is sent. Other checks still apply when you send.
    *
    */
-  readonly can_start?: boolean;
+  readonly can_start: boolean;
 };
 
 /**
@@ -10860,6 +10851,29 @@ export type Verification = {
   readonly verified_at?: string | null;
 } & Timestamps;
 
+export type VerificationCheckResult = {
+  /**
+   * Whether the submitted passcode verified this verification. `true` means the passcode was correct and the verification is now complete; `false` means it did not verify, and `reason` says why. A verification that has already reached a final state is no longer checkable and returns `404`.
+   */
+  readonly success: boolean;
+  /**
+   * Why the check did not succeed:
+   *
+   * - `incorrect_code`: The passcode was wrong and attempts remain.
+   * - `expired`: The validity window elapsed.
+   * - `attempts_exhausted`: Too many incorrect attempts were submitted.
+   *
+   * `null` when `success` is `true`. Treat unrecognized values as reasons added
+   * later.
+   */
+  readonly reason?: string | null;
+  verification: Verification;
+  /**
+   * The number of check attempts left while the verification is still pending, or `null` once it has reached a final state.
+   */
+  readonly attempts_remaining?: number | null;
+};
+
 /**
  * Per-request overrides applied to this verification only. `language` picks one of Bird's built-in translations; a custom sender that carries its own template renders the language that template stocks instead. An email template pinned to a custom email sender falls back to its own default language rather than to English (Verify only accepts templates whose language settings fall back). A WhatsApp authentication template follows its own missing-language policy: it falls back to its default or, when set to fail, refuses the send for a language it does not stock. The requested tag stays fixed for the verification.
  */
@@ -10901,7 +10915,7 @@ export type VerificationCreateRequest = {
   to: VerificationTo;
   options?: VerificationOptions;
   /**
-   * Optional key/value pairs to attach to the verification, for example a correlation id. Returned on the verification.
+   * Optional key/value pairs to attach to the verification, for example a correlation id. Returned on the verification and copied onto the SMS, WhatsApp or email message that carries the code, so reads of that message and its webhooks return it too. The copy is skipped when the object is larger than 2 KB serialized.
    */
   metadata?: {
     [key: string]: unknown;
@@ -10914,29 +10928,6 @@ export type VerificationCheckRequest = {
    * The passcode the recipient received. Passcodes are numeric; submit the digits exactly as delivered. An incorrect value is a normal `200` outcome with `success: false`. It does not return an error.
    */
   code: string;
-};
-
-export type VerificationCheckResult = {
-  /**
-   * Whether the submitted passcode verified this verification. `true` means the passcode was correct and the verification is now complete; `false` means it did not verify, and `reason` says why. A verification that has already reached a final state is no longer checkable and returns `404`.
-   */
-  readonly success: boolean;
-  /**
-   * Why the check did not succeed:
-   *
-   * - `incorrect_code`: The passcode was wrong and attempts remain.
-   * - `expired`: The validity window elapsed.
-   * - `attempts_exhausted`: Too many incorrect attempts were submitted.
-   *
-   * `null` when `success` is `true`. Treat unrecognized values as reasons added
-   * later.
-   */
-  readonly reason?: string | null;
-  verification: Verification;
-  /**
-   * The number of check attempts left while the verification is still pending, or `null` once it has reached a final state.
-   */
-  readonly attempts_remaining?: number | null;
 };
 
 export type VerificationNextChannelRequest = {
@@ -12085,7 +12076,7 @@ export type WhatsAppTemplateSend = unknown & {
    */
   language?: LanguageTag;
   /**
-   * Multiplies `optimization_spec.bid_amount` × country multiplier for this message. Range 0.01–100; default 1. Requires `optimization_spec` on a marketing template language.
+   * Multiplies `optimization_spec.bid_amount` × country multiplier for this message. Range 0.1–2; default 1. Requires `optimization_spec` on a marketing template language. The result must stay at most 50000 (0.50 per delivery) for the recipient's country; a recipient without a known country is checked against the language's highest.
    */
   bid_multiplier?: number;
   /**
@@ -13736,13 +13727,13 @@ export type WhatsAppTemplateBidStrategyWrite = "lowest_cost_with_bid_cap";
  */
 export type WhatsAppTemplateOptimizationSpecWrite = {
   /**
-   * The maximum price per 1,000 deliveries, in the smallest unit of the account's currency. The reach estimate returns that currency as `currency_code`. 5000 is USD 0.05 per delivery.
+   * The maximum price per 1,000 deliveries, in the smallest unit of the account's currency. The reach estimate returns that currency as `currency_code`. 5000 is USD 0.05 per delivery. At most 50000, which is 0.50 per delivery.
    *
    */
   bid_amount: number;
   bid_strategy: WhatsAppTemplateBidStrategyWrite;
   /**
-   * Scales the bid for recipients in a country, keyed by ISO 3166-1 alpha-2 code. A country you leave out uses 1. Each write replaces the whole map.
+   * Scales the bid for recipients in a country, keyed by ISO 3166-1 alpha-2 code. A country you leave out uses 1. Each write replaces the whole map. `bid_amount` times a country's multiplier must also be at most 50000.
    *
    */
   bid_country_multiplier_overrides?: {
@@ -20593,7 +20584,7 @@ export type EmailStatsQueryMetric =
  * Every selected metric must support the grouping dimension and every filter dimension.
  * Unsupported combinations return validation error `E04074`, even when the workspace has no events.
  *
- * - `sending_domain`, `category`, `template_id`, `tag`: all metrics.
+ * - `brand_id`, `sending_domain`, `category`, `template_id`, `tag`: all metrics. A null `brand_id` represents historical or unattributed traffic recorded without a Brand and is distinct from the workspace's default Brand.
  * - `recipient_domain`, `ip_pool_id`, `broadcast_id`: all metrics except `sends_accepted`.
  * - `mailbox_provider`, `mailbox_provider_region`: all metrics except `sends_accepted`, `accepted`, and `rejected`.
  * - `sending_ip`: `delivered`, `bounced`, `hard_bounced`, `soft_bounced`, `admin_bounced`, `block_bounced`,
@@ -20607,6 +20598,7 @@ export type EmailStatsQueryMetric =
  *
  */
 export type EmailStatsQueryDimension =
+  | "brand_id"
   | "sending_domain"
   | "category"
   | "template_id"
@@ -20631,6 +20623,14 @@ export type EmailStatsQueryDimension =
  */
 export type EmailStatsQueryGrain =
   "quarter_hour" | "hour" | "half_day" | "day" | "week" | "month";
+
+/**
+ * Match recorded Brand IDs using include or exclude. Include values combine with OR; exclusions remove matches. Missing values (`brand_id` null) survive exclude-only predicates. Brand listing is dashboard-only; copy a Brand ID from Brands > More actions > Copy brand ID in the dashboard, or ask the caller for the ID when only a Brand name is known. Supply a nonempty array; at most 20 distinct values across both arrays are accepted after normalization, with no overlap.
+ */
+export type EmailStatsQueryBrandFilter = {
+  include?: Array<BrandId>;
+  exclude?: Array<BrandId>;
+};
 
 /**
  * Match recorded values using include or exclude. Include values combine with OR; exclusions remove matches. Missing values survive exclude-only predicates. Supply a nonempty array; at most 20 distinct values across both arrays are accepted after normalization, with no overlap.
@@ -20685,6 +20685,7 @@ export type EmailStatsQueryBroadcastFilter = {
  * Predicates on the context recorded for each event. Dimensions combine with AND. Unsupported metric and dimension combinations return 422, including for an empty workspace.
  */
 export type EmailStatsQueryFilters = {
+  brand_id?: EmailStatsQueryBrandFilter;
   sending_domain?: EmailStatsQueryStringFilter;
   category?: EmailStatsQueryCategoryFilter;
   template_id?: EmailStatsQueryTemplateFilter;
@@ -20735,7 +20736,7 @@ export type EmailStatsQueryRequest = {
   group_by?: EmailStatsQueryDimension;
   grain?: EmailStatsQueryGrain;
   /**
-   * Filter recorded event context with include/exclude predicates. Include values combine with OR; dimensions combine with AND. Exclude-only predicates retain missing values. Tag filters require one case-sensitive name; a name without values requires presence. Each predicate accepts at most 20 distinct values across include and exclude. Every selected metric must support every filter dimension, using the same compatibility rules as group_by. Resolve template and IP-pool names to IDs before filtering. Broadcast filters use IDs. Current names do not establish historical attribution.
+   * Filter recorded event context with include/exclude predicates. Include values combine with OR; dimensions combine with AND. Exclude-only predicates retain missing values. Tag filters require one case-sensitive name; a name without values requires presence. Each predicate accepts at most 20 distinct values across include and exclude. Every selected metric must support every filter dimension, using the same compatibility rules as group_by. Resolve template and IP-pool names to IDs before filtering. Broadcast and Brand filters require IDs; copy a Brand ID from Brands > More actions > Copy brand ID in the dashboard, or ask the caller for the ID when only a Brand name is known. Current names do not establish historical attribution.
    */
   filters?: EmailStatsQueryFilters;
   /**
@@ -20764,6 +20765,10 @@ export type EmailStatsQueryRequest = {
  * Contains the requested group_by property, including a null value when context is missing. Ungrouped results use an empty object.
  */
 export type EmailStatsQueryDimensions = {
+  /**
+   * Recorded Brand id value. Null represents historical or unattributed traffic recorded without a Brand and is distinct from the default Brand.
+   */
+  brand_id?: BrandId | null;
   /**
    * Recorded sending domain value. Null represents missing context and differs from an empty string.
    */
@@ -21511,6 +21516,62 @@ export type EmailStatsByBroadcastResponse = {
    */
   refresh_cursor: string | null;
 };
+
+/**
+ * The window this Brand breakdown was actually computed against. Bounds are either inclusive calendar days (YYYY-MM-DD in the requested `timezone`, UTC when omitted) or RFC 3339 UTC instants marking the starts of the first and last included 15-minute quarters (aligned to local quarter-hour boundaries when `timezone` is set).
+ *
+ */
+export type EmailStatsBrandPeriod = {
+  /**
+   * Inclusive start of the window the response covers. A calendar day (`YYYY-MM-DD`, in the requested `timezone`) for day windows, or an RFC 3339 UTC instant marking the start of the first included 15-minute quarter (aligned to a local quarter-hour boundary when `timezone` is set).
+   */
+  readonly from: string;
+  /**
+   * Inclusive end of the window the response covers. A calendar day (`YYYY-MM-DD`, in the requested `timezone`) for day windows, or an RFC 3339 UTC instant marking the start of the last included 15-minute quarter (covering the 15 minutes from this timestamp; aligned to a local quarter-hour boundary when `timezone` is set).
+   */
+  readonly to: string;
+  /**
+   * Always `null` for Brand breakdowns because they read retained reporting events directly rather than asynchronous rollups.
+   */
+  readonly data_as_of?: string | null;
+};
+
+/**
+ * Delivery, engagement, and latency figures for one Brand's email traffic over the requested period, or for historical unbranded traffic when brand_id is null.
+ */
+export type EmailBrandStatsPoint = {
+  /**
+   * The Brand recorded at send time (`bnd_…`, copyable from Brands > More actions > Copy brand ID in the dashboard). Archived Brands continue to appear keyed by their ID. `null` represents historical or unattributed messages sent without a Brand and is distinct from the workspace's default Brand.
+   *
+   */
+  readonly brand_id: BrandId | null;
+  readonly delivery: EmailDeliveryStats;
+  readonly engagement: EmailEngagementStats;
+  /**
+   * Latency quantiles for this Brand. Retained reporting events populate `processing` and `total` quantiles; `delivery` quantiles are `null`.
+   *
+   */
+  readonly latency: EmailLatencyStats;
+};
+
+/**
+ * Per-Brand breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
+ */
+export type EmailStatsByBrandResponse = {
+  /**
+   * The resolved window the response covers (inclusive calendar dates in `YYYY-MM-DD`, or RFC 3339 starts of the first and last included 15-minute quarters), plus `data_as_of` (`null` because this breakdown reads retained reporting events directly).
+   */
+  readonly period: EmailStatsBrandPeriod;
+  /**
+   * Brand breakdown rows, ranked by the `sort` metric (default `processed`) descending. Includes a row with `brand_id` set to `null` when historical unbranded traffic occurred in the period.
+   */
+  readonly data: Array<EmailBrandStatsPoint>;
+  /**
+   * Total number of distinct Brand groups with activity in the period (including the `null` unbranded group when present), regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
+   *
+   */
+  readonly total: number;
+} & ListEnvelope;
 
 /**
  * The boundaries this signal's status was judged against. Use them to classify your own slices, such as per-domain or per-tag rates, against the same bands. The `direction` field identifies the risky side of the boundaries: `above` means the status degrades as the value rises past a boundary, as with bounce and complaint rates, and `below` means it degrades as the value falls, as with delivery rate. The boundaries are exclusive, so a value exactly on one keeps the better status. Omitted for a metric with no risk boundaries, such as open rate.
@@ -29466,13 +29527,10 @@ export type VoiceSessionCredential = {
  *   trunk's allowed-address list. Add the address your PBX sends from.
  * - `caller_id_not_verified`: The number in the `From` header is not a verified
  *   caller ID for this workspace. Verify it or use a verified caller ID.
- * - `number_ownership_not_verified`: The ownership documents for this purchased
- *   number have not yet been accepted under its country's requirements. We
- *   block outgoing and incoming legs on the number until verification is
- *   complete. Blocked incoming legs never reach your PBX, and their route type
- *   is `reject` regardless of the number's configuration. Open the number
- *   under **Numbers** and complete its ownership requirements, then retry
- *   the leg.
+ * - `number_ownership_not_verified`: Calls are blocked on this purchased number
+ *   while ownership or activation checks are incomplete. Refused incoming legs
+ *   do not reach your PBX and have route type `reject`. Find the number under
+ *   **Numbers** and follow its current ownership or activation step.
  * - `destination_not_enabled`: Calling to this destination country is disabled.
  *   Enable it in your voice destination settings.
  * - `insufficient_balance`: Your wallet balance was too low for the leg.
@@ -30441,13 +30499,31 @@ export type VoiceTrunkCore = {
    */
   readonly domain: string;
   /**
-   * Whether this trunk may place calls: your PBX connects to us to dial out. Off on a new trunk. While it is off the trunk refuses every call attempt no matter what its allow lists say, and the connection and authentication settings below have no effect. Set `outbound_enabled` through the trunk update operation.
+   * Whether your PBX may place calls through this trunk, admitted by `ip_acls` or `allowed_api_key_ids`. Off on a new trunk. While it is off, the allow lists admit no call. Set `sip_trunking_enabled` when you create the trunk or through the trunk update operation.
    *
+   */
+  readonly sip_trunking_enabled: boolean;
+  /**
+   * Whether this trunk may receive calls: we dial the addresses you declared, for the numbers this trunk answers. Off on a new trunk. Turning it off resets number routes that use this trunk to reject incoming calls. Turning it back on does not restore those routes. Set `did_delivery_enabled` when you create the trunk or through the trunk update operation.
+   *
+   */
+  readonly did_delivery_enabled: boolean;
+  /**
+   * Whether people in this workspace may place calls through this trunk with a session credential, from the dashboard phone, the CLI or MCP. Off on a new trunk. It grants nothing on its own: a call still has to present a credential issued to this workspace, and each one expires within minutes. Set `workspace_users_enabled` when you create the trunk or through the trunk update operation.
+   *
+   */
+  readonly workspace_users_enabled: boolean;
+  /**
+   * Deprecated: read `sip_trunking_enabled` and `workspace_users_enabled` instead. `true` while any caller may place calls through this trunk.
+   *
+   *
+   * @deprecated
    */
   readonly outbound_enabled: boolean;
   /**
-   * Whether this trunk may receive calls: we dial the addresses you declared, for the numbers this trunk answers. Off on a new trunk. Turning it off resets number routes that use this trunk to reject incoming calls. Turning it back on does not restore those routes. Set `inbound_enabled` through the trunk update operation.
+   * Deprecated: read `did_delivery_enabled`, which has the same value.
    *
+   * @deprecated
    */
   readonly inbound_enabled: boolean;
   /**
@@ -30456,12 +30532,12 @@ export type VoiceTrunkCore = {
    */
   readonly media_bypass: boolean;
   /**
-   * The trunk's IP allow list. IP filtering is active whenever this has at least one entry: calls admitted through the allow lists must come from those CIDR ranges. This restriction does not apply to session credentials when `session_credentials_enabled` is true. An empty list means no IP restriction. Replace the whole `ip_acls` list through the trunk update operation.
+   * The trunk's IP allow list. IP filtering is active whenever this has at least one entry: calls admitted through the allow lists must come from those CIDR ranges. This restriction does not apply to session credentials when `workspace_users_enabled` is true. An empty list means no IP restriction. Replace the whole `ip_acls` list through the trunk update operation.
    *
    */
   readonly ip_acls: Array<VoiceTrunkIpacl>;
   /**
-   * The API keys allowed to authenticate this trunk over SIP Digest. A key must hold `voice` at write level and be neither revoked nor expired to authenticate. `ineligible_api_key_ids` names the entries that currently cannot. A nonempty list enables API-key authentication, limited to its eligible keys. An empty list means no API-key authentication. A trunk with empty `ip_acls` and `allowed_api_key_ids` lists accepts nothing when `session_credentials_enabled` is false. Replace the whole `allowed_api_key_ids` list through the trunk update operation.
+   * The API keys allowed to authenticate this trunk over SIP Digest. A key must hold `voice` at write level and be neither revoked nor expired to authenticate. `ineligible_api_key_ids` names the entries that currently cannot. A nonempty list enables API-key authentication, limited to its eligible keys. An empty list means no API-key authentication. A trunk with empty `ip_acls` and `allowed_api_key_ids` lists accepts no call from your PBX. Replace the whole `allowed_api_key_ids` list through the trunk update operation.
    *
    */
   readonly allowed_api_key_ids: Array<ApiKeyId>;
@@ -30471,13 +30547,14 @@ export type VoiceTrunkCore = {
    */
   readonly ineligible_api_key_ids: Array<ApiKeyId>;
   /**
-   * The Digest hash algorithms this trunk offers, in the order they are offered. We send one challenge line per algorithm and your PBX answers with the first it supports, so the order decides what most equipment picks. Always populated: a trunk with no explicit setting reports the default, `["SHA-256", "MD5"]`. The list governs clients that authenticate with an API key: their answer with an algorithm that is not on it is rejected, so narrowing the list also narrows what the trunk accepts from them. Session credentials, which the dashboard phone uses and `POST /v1/voice/session-credentials` creates, are the exception: with `session_credentials_enabled`, the challenge always ends with an MD5 line, after the list in its own order, and a valid session credential is accepted with MD5 or SHA-256. An API-key answer with that extra MD5 is still rejected. Replace `digest_algorithms` through the trunk update operation.
+   * The Digest hash algorithms this trunk offers, in the order they are offered. We send one challenge line per algorithm and your PBX answers with the first it supports, so the order decides what most equipment picks. Always populated: a trunk with no explicit setting reports the default, `["SHA-256", "MD5"]`. The list governs clients that authenticate with an API key: their answer with an algorithm that is not on it is rejected, so narrowing the list also narrows what the trunk accepts from them. Session credentials, which the dashboard phone uses and `POST /v1/voice/session-credentials` creates, are the exception: with `workspace_users_enabled`, the challenge always ends with an MD5 line, after the list in its own order, and a valid session credential is accepted with MD5 or SHA-256. An API-key answer with that extra MD5 is still rejected. Replace `digest_algorithms` through the trunk update operation.
    *
    */
   readonly digest_algorithms: Array<VoiceSipDigestAlgorithm>;
   /**
-   * Whether a session credential may be used to connect to this trunk from a web browser, the CLI or MCP, alongside whatever the allow lists admit. Off by default. It grants nothing on its own: a call still has to present a credential issued to this workspace, and each one expires within minutes. Set `session_credentials_enabled` through the trunk update operation.
+   * Deprecated: read `workspace_users_enabled`, which has the same value.
    *
+   * @deprecated
    */
   readonly session_credentials_enabled: boolean;
 };
@@ -30555,29 +30632,50 @@ export type VoiceTrunkCreate = {
    */
   name: string;
   /**
-   * Whether the new trunk may place calls. Omit it to create a trunk that does neither direction yet, and enable the ones you want once you know what the trunk is for. The settings below configure outbound, so send this as `true` alongside them.
+   * Whether your PBX may place calls through the new trunk. Omit it to create a trunk that carries no calls yet, and turn on what you need once you know what the trunk is for.
    *
+   */
+  sip_trunking_enabled?: boolean;
+  /**
+   * Whether the new trunk may receive calls. A trunk receives no calls until it also has at least one gateway and at least one number, both added after create.
+   *
+   */
+  did_delivery_enabled?: boolean;
+  /**
+   * Whether people in this workspace may place calls through the new trunk with a session credential, from the dashboard phone, the CLI or MCP. Omit it for a trunk reached only by a PBX.
+   *
+   */
+  workspace_users_enabled?: boolean;
+  /**
+   * Deprecated: use `sip_trunking_enabled`. `true` turns on `sip_trunking_enabled`; a request that also sends `sip_trunking_enabled: false` is rejected.
+   *
+   *
+   * @deprecated
    */
   outbound_enabled?: boolean;
   /**
-   * Whether the new trunk may receive calls. Omit it to create a trunk that does neither direction yet. A trunk receives no calls until it also has at least one gateway and at least one number, both added after create.
+   * Deprecated: use `did_delivery_enabled`. A request that sends both with different values is rejected.
    *
+   *
+   * @deprecated
    */
   inbound_enabled?: boolean;
   /**
-   * Whether we take ourselves out of the audio path for calls we forward to this trunk. Omit it to create the trunk with this off, which is what suits equipment behind NAT and any account that wants call recording. It is an inbound setting, so `true` is accepted only alongside `inbound_enabled: true`; `false` is always accepted. It can be changed later.
+   * Whether we take ourselves out of the audio path for calls we forward to this trunk. Omit it to create the trunk with this off, which is what suits equipment behind NAT and any account that wants call recording. It is an inbound setting, so `true` is accepted only alongside `did_delivery_enabled: true`; `false` is always accepted. It can be changed later.
    *
    */
   media_bypass?: boolean;
   media?: VoiceTrunkMediaCreate;
   /**
-   * The Digest hash algorithms to offer, in the order they should be offered. Omit this to use the default of `["SHA-256", "MD5"]`, which suits most equipment. Send `["MD5"]` for a PBX that only implements MD5 and rejects or ignores a challenge offering SHA-256 first. This governs clients that authenticate with an API key. Session credentials, including the dashboard phone's, are always offered MD5 as well and accepted with MD5 or SHA-256. This can be changed later without re-issuing credentials.
+   * The Digest hash algorithms to offer, in the order they should be offered. Omit this to use the default of `["SHA-256", "MD5"]`, which suits most equipment. Send `["MD5"]` for a PBX that only implements MD5 and rejects or ignores a challenge offering SHA-256 first. This governs clients that authenticate with an API key. Session credentials, including the dashboard phone's, are always offered MD5 as well and accepted with MD5 or SHA-256. It applies to calls the trunk places, so send it alongside `sip_trunking_enabled` or `workspace_users_enabled` set to `true`. This can be changed later without re-issuing credentials.
    *
    */
   digest_algorithms?: Array<VoiceSipDigestAlgorithm>;
   /**
-   * Whether a session credential may be used to connect to this trunk from a web browser, the CLI or MCP. Omit it to create the trunk with this off, which is what a trunk reached only by a PBX wants. It can be changed later.
+   * Deprecated: use `workspace_users_enabled`. A request that sends both with different values is rejected.
    *
+   *
+   * @deprecated
    */
   session_credentials_enabled?: boolean;
 };
@@ -30606,14 +30704,15 @@ export type VoiceTrunkIpaclCreate = {
 };
 
 /**
- * A change to the trunk's directions, name, access control, and Digest algorithm
- * offer. Every field is optional. An omitted field is left unchanged. The
+ * A change to the trunk's caller switches, name, access control, and Digest
+ * algorithm offer. Every field is optional. An omitted field is left unchanged. The
  * `ip_acls`, `allowed_api_key_ids`, and `digest_algorithms` fields each replace
  * their whole list when present. Send an empty array to clear one. This lets you
  * commit the trunk's entire access configuration in one update.
  *
- * A direction has to be enabled before its settings can be set, but one update
- * can do both: enable a direction and send its configuration together.
+ * The access control and Digest settings need a switch that places calls, and
+ * `media_bypass` needs `did_delivery_enabled`. One update can do both: turn the
+ * switch on and send its configuration together.
  *
  */
 export type VoiceTrunkUpdate = {
@@ -30622,17 +30721,36 @@ export type VoiceTrunkUpdate = {
    */
   name?: string;
   /**
-   * Whether this trunk may place calls. Turning it off stops the trunk admitting call attempts at the next call setup and leaves its connection and authentication settings stored, so turning it back on restores a working trunk. Omit the field to leave it unchanged.
+   * Whether your PBX may place calls through this trunk. Turning it off stops the allow lists admitting calls at the next call setup and leaves them stored, so turning it back on restores a working trunk. Omit the field to leave it unchanged.
    *
+   */
+  sip_trunking_enabled?: boolean;
+  /**
+   * Whether this trunk may receive calls. Turning it off resets number routes that use this trunk to reject incoming calls. Turning it back on does not restore those routes. Clear an attached emergency number in the dashboard before turning it off. The gateways remain configured. Omit the field to leave it unchanged.
+   *
+   */
+  did_delivery_enabled?: boolean;
+  /**
+   * Whether people in this workspace may place calls through this trunk with a session credential, from the dashboard phone, the CLI or MCP. Turning it off stops those calls at the next call setup without re-issuing anything. Omit the field to leave it unchanged.
+   *
+   */
+  workspace_users_enabled?: boolean;
+  /**
+   * Deprecated: use `sip_trunking_enabled` and `workspace_users_enabled`. `true` turns on `sip_trunking_enabled`. `false` stops every caller placing calls through this trunk. A request that also turns one of those switches the other way is rejected.
+   *
+   *
+   * @deprecated
    */
   outbound_enabled?: boolean;
   /**
-   * Whether this trunk may receive calls. Turning it off resets number routes that use this trunk to reject incoming calls. Turning it back on does not restore those routes. Clear an attached emergency number in the dashboard before turning inbound off. The gateways remain configured. Omit the field to leave it unchanged.
+   * Deprecated: use `did_delivery_enabled`. A request that sends both with different values is rejected.
    *
+   *
+   * @deprecated
    */
   inbound_enabled?: boolean;
   /**
-   * Whether we take ourselves out of the audio path for calls we forward to this trunk. Turning it on takes effect at the next call setup and leaves calls already up untouched. It is an inbound setting, so the trunk must have `inbound_enabled` on; one update can do both. While it is on we cannot record those calls, report their audio quality, or end one because its audio stopped, and your equipment must be reachable for audio from the public internet. Turning it off puts us back in the path at the next call setup. Omit the field to leave it unchanged.
+   * Whether we take ourselves out of the audio path for calls we forward to this trunk. Turning it on takes effect at the next call setup and leaves calls already up untouched. It is an inbound setting, so the trunk must have `did_delivery_enabled` on; one update can do both. While it is on we cannot record those calls, report their audio quality, or end one because its audio stopped, and your equipment must be reachable for audio from the public internet. Turning it off puts us back in the path at the next call setup. Omit the field to leave it unchanged.
    *
    */
   media_bypass?: boolean;
@@ -30653,8 +30771,10 @@ export type VoiceTrunkUpdate = {
    */
   digest_algorithms?: Array<VoiceSipDigestAlgorithm>;
   /**
-   * Whether a session credential may be used to connect to this trunk from a web browser, the CLI or MCP. Off by default; turning it on does not change what the allow lists admit, and turning it off stops those connections at the next call setup without re-issuing anything. Omit the field to leave it unchanged.
+   * Deprecated: use `workspace_users_enabled`. A request that sends both with different values is rejected.
    *
+   *
+   * @deprecated
    */
   session_credentials_enabled?: boolean;
 };
@@ -34643,11 +34763,11 @@ export type EmailBroadcastTemplateWritable = {
 };
 
 /**
- * Why sending stopped for funds and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.
+ * Why sending stopped for funds or a sending limit, and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.
  *
- * The send-allowance response includes `can_start` when waiting and resuming are available. If `can_start` is absent, do not assume a top-up can recover a broadcast or that a failed broadcast can resume.
+ * For a funds hold, add funds during the wait to let sending continue automatically. After the broadcast pauses, check the balance and add funds if it is still short, then resume it explicitly. For `send_limit_reached`, adding funds does not help: sending continues when the limit allows more email, and after a pause you resume it once it does. Resume is refused while the next batch still cannot be paid for or would go over a sending limit. A failed broadcast cannot resume.
  *
- * Each interruption can wait up to 20 minutes for funds. Checks, refused batches and partial top-ups during the same interruption do not extend its deadline. Automatic continuation or an explicit resume clears the hold; if sending later stops for funds again, a new 20-minute wait begins.
+ * Each interruption can wait up to 20 minutes for funds. An interruption for a sending limit (`send_limit_reached`) waits until 10 minutes after the next midnight UTC, when the daily limit resets. Checks, refused batches and partial top-ups during the same interruption do not extend its deadline. Automatic continuation or an explicit resume clears the hold; if sending later stops again, a new wait begins.
  *
  */
 export type EmailBroadcastFundingHoldWritable = {
@@ -34742,9 +34862,9 @@ export type EmailBroadcastCountsWritable = {
  *
  * The organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.
  *
- * Servers that support funding recovery return `can_start`; callers with billing read access also receive `on_insufficient_funds`. If `can_start` is absent, use `allowed` to check the current allowance and do not assume automatic waiting or resumability. An absent field is different from `can_start: false`, which explicitly says the broadcast cannot start.
+ * Use `can_start` to check whether the email limits let this broadcast start. If the balance runs out during sending, the broadcast waits up to 20 minutes and can continue automatically if enough funds become available during that wait. Otherwise it pauses until you resume it. It checks for funds once a minute. This does not enable automatic top-up or initiate a payment.
  *
- * `limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit. `on_insufficient_funds` says what happens if the balance runs out mid-send. Like `limit_reason`, it is present only when you have `org:billing` read access.
+ * `limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit.
  *
  */
 export type EmailBroadcastSendQuotaWritable = {
@@ -37046,6 +37166,10 @@ export type EmailStatsResponseWritable = {
  */
 export type EmailStatsQueryDimensionsWritable = {
   /**
+   * Recorded Brand id value. Null represents historical or unattributed traffic recorded without a Brand and is distinct from the default Brand.
+   */
+  brand_id?: BrandId | null;
+  /**
    * Recorded sending domain value. Null represents missing context and differs from an empty string.
    */
   sending_domain?: string | null;
@@ -37375,6 +37499,18 @@ export type EmailStatsByBroadcastResponseWritable = {
    */
   refresh_cursor: string | null;
 };
+
+/**
+ * Delivery, engagement, and latency figures for one Brand's email traffic over the requested period, or for historical unbranded traffic when brand_id is null.
+ */
+export type EmailBrandStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-Brand breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
+ */
+export type EmailStatsByBrandResponseWritable = ListEnvelope;
 
 /**
  * The workspace's current sending-health verdict over the requested window, plus reference deliverability limits and classification boundaries. Use it to render a health badge, the bounce-rate and complaint-rate limit labels, and the risk lines on deliverability charts without hard-coding any thresholds of your own.
@@ -43812,6 +43948,10 @@ export type ListEmailBroadcastRecipientsErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The resource existed but is no longer available.
+   */
+  410: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -70422,6 +70562,110 @@ export type GetEmailStatsByBroadcastResponses = {
 
 export type GetEmailStatsByBroadcastResponse =
   GetEmailStatsByBroadcastResponses[keyof GetEmailStatsByBroadcastResponses];
+
+export type GetEmailStatsByBrandData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * Inclusive start of the window: a calendar day (`YYYY-MM-DD`) or an RFC 3339 instant (rounded down to a local quarter-hour). Use the same form for `from` and `to`, and use `Z` UTC instants when `timezone` is supplied. Defaults to 30 calendar days before `to` when both are omitted. Must fall within retained reporting history (last 180 days, on or after `2026-09-23T00:00:00Z`).
+     *
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window: a calendar day (`YYYY-MM-DD`, including the whole local day) or an RFC 3339 instant (rounded down to a local quarter-hour and including that quarter-hour). Must use the same form as `from` and not lie in the future for instant windows. Calendar windows allow up to 365 local days; instant windows allow up to 720 hours. Defaults to today in `timezone` when both are omitted.
+     *
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Not supported on breakdown endpoints. Supplying it returns `422`. To compare categories, use `GET /v1/email/stats/categories`, or use `POST /v1/email/stats/query` to combine `brand_id` and `category`.
+     */
+    category?: string;
+    /**
+     * Metric to rank rows by, applied descending. Supports every count and rate defined by `EmailStatsSortMetric`; rows whose rate is undefined (zero denominator) sort last. Defaults to `processed`.
+     *
+     */
+    sort?: EmailStatsSortMetric;
+    /**
+     * Maximum number of Brand rows to return, ranked by the `sort` field descending.
+     */
+    limit?: number;
+  };
+  url: "/v1/email/stats/brands";
+};
+
+export type GetEmailStatsByBrandErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailStatsByBrandError =
+  GetEmailStatsByBrandErrors[keyof GetEmailStatsByBrandErrors];
+
+export type GetEmailStatsByBrandResponses = {
+  /**
+   * Per-Brand breakdown for the requested period.
+   */
+  200: EmailStatsByBrandResponse;
+};
+
+export type GetEmailStatsByBrandResponse =
+  GetEmailStatsByBrandResponses[keyof GetEmailStatsByBrandResponses];
 
 export type GetEmailHealthData = {
   body?: never;

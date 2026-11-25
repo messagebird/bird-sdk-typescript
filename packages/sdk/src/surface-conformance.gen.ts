@@ -5,7 +5,7 @@
 import type { BirdClient } from "./client.js";
 
 export type _Email = Pick<BirdClient["email"], "send" | "sendBatch" | "get" | "list" | "cancel" | "health" | "content" | "recipients">;
-export type _EmailStats = Pick<BirdClient["email"]["stats"], "query" | "summary" | "daily" | "hourly" | "byTag" | "byCategory" | "bySendingIp" | "bySendingDomain" | "byRecipientDomain" | "byMailboxProvider" | "byMailboxProviderRegion" | "byTemplate" | "byLocation" | "byClient" | "byBounceCode" | "byComplaintType" | "byBroadcast">;
+export type _EmailStats = Pick<BirdClient["email"]["stats"], "query" | "summary" | "daily" | "hourly" | "byTag" | "byCategory" | "bySendingIp" | "bySendingDomain" | "byRecipientDomain" | "byMailboxProvider" | "byMailboxProviderRegion" | "byTemplate" | "byBrand" | "byLocation" | "byClient" | "byBounceCode" | "byComplaintType" | "byBroadcast">;
 export type _EmailCompetitiveBrands = Pick<BirdClient["email"]["competitive"]["brands"], "search">;
 export type _EmailCompetitiveWatchlist = Pick<BirdClient["email"]["competitive"]["watchlist"], "get" | "notable">;
 export type _EmailCompetitiveWatchlistBrands = Pick<BirdClient["email"]["competitive"]["watchlist"]["brands"], "create" | "delete" | "get" | "sendTime">;

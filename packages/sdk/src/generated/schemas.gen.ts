@@ -1696,7 +1696,7 @@ export const EmailDeliveryStatsSchema = {
   additionalProperties: false,
   readOnly: true,
   description:
-    "Delivery counts and rates for the scope of the containing row (a time bucket, a breakdown dimension, or the whole period). Lifecycle counts identify distinct recipients that reached the named stage in scope; `oob_bounces` counts distinct failure events. Period summaries count each identity once per metric across the whole window, so adding time-bucket distinct counts can overstate the summary. Event time determines attribution; send time does not. A recipient delivered on Monday counts in Monday's row. A recipient who bounced and then succeeded on a retry can appear in both `bounced` and `delivered`. Very large counts are close estimates rather than exact tallies.\n\nThese counts are successive lifecycle stages, so a recipient can appear in more than one:\n\n- `rejected`: Happens before any send attempt, from suppression, policy, or a generation failure.\n- `deferred`: A temporary in-flight delay that is still being retried.\n- `bounced`: A delivery failure, with its own hard, soft, admin, block, and undetermined sub-types.\n- `complained`: Post-delivery spam feedback.\n\nEach rate is a fraction in the range 0 to 1 and is null when its denominator is zero. `accepted` is reported only where it can be attributed (time buckets and the period summary). Breakdown rows omit it.\n",
+    "Delivery counts and rates for the scope of the containing row (a time bucket, a breakdown dimension, or the whole period). Lifecycle counts identify distinct recipients that reached the named stage in scope; `oob_bounces` counts distinct failure events. Period summaries count each identity once per metric across the whole window, so adding time-bucket distinct counts can overstate the summary. Event time determines attribution; send time does not. A recipient delivered on Monday counts in Monday's row. A recipient who bounced and then succeeded on a retry can appear in both `bounced` and `delivered`. Very large counts are close estimates rather than exact tallies.\n\nThese counts are successive lifecycle stages, so a recipient can appear in more than one:\n\n- `rejected`: Happens before any send attempt, from suppression, policy, or a generation failure.\n- `deferred`: A temporary in-flight delay that is still being retried.\n- `bounced`: A delivery failure, with its own hard, soft, admin, block, and undetermined sub-types.\n- `complained`: Post-delivery spam feedback.\n\nEach rate is a fraction and is null when its denominator is zero. `delivery_rate` and `bounce_rate` fall in the range 0 to 1, while event-time `complaint_rate` and `oob_rate` can exceed 1 when late signals outnumber attempts in a narrow window. `accepted` is reported only where it can be attributed (time buckets and the period summary). Breakdown rows omit it.\n",
   required: [
     "processed",
     "delivered",
@@ -1805,10 +1805,9 @@ export const EmailDeliveryStatsSchema = {
     oob_rate: {
       type: ["number", "null"],
       minimum: 0,
-      maximum: 1,
       readOnly: true,
       description:
-        "Share of this scope's delivery attempts that resulted in an out-of-band bounce, computed as `oob_bounces / (delivered + bounced)`. Null when there were no attempts.",
+        "Out-of-band bounce events in this scope relative to delivery attempts, computed as `oob_bounces / (delivered + bounced)`. Because out-of-band bounces are attributed by event time as distinct events, a scope can record more of them than it attempted, pushing the rate above 1. Null when there were no attempts.\n",
       example: 0.00014,
     },
     delivery_rate: {
@@ -9029,7 +9028,7 @@ export const EmailBroadcastStatusSchema = {
     "failed",
   ],
   description:
-    "Where the broadcast itself has got to. This is separate from what happened to individual recipients, which the broadcast's own `sent_count`, `delivered_count`, `bounced_count` and `complained_count` tell you. Those four are fields on the broadcast, not on everything that carries this status, and reading the broadcast's recipients or its events gives the same outcomes one recipient at a time.\n\nThe send-allowance response includes `can_start` when funding recovery is available. If the field is absent, do not assume the broadcast can wait for funds or resume.\n\n- `draft`: Created, and not sent or scheduled yet.\n- `scheduled`: Due to send at `scheduled_at`. You can still edit it, and you can still change the time, right up until sending starts.\n- `accepted`: Taken for immediate sending. Nothing has gone out yet.\n- `sending`: On its way. Some recipients have been sent to and some have not.\n- `waiting_for_funds`: Sending stopped because your balance cannot pay for more email. You can add funds manually or let your existing automatic top-up restore the balance. Bird checks once a minute and continues sending to the remaining recipients when a funding check succeeds before `funding_hold.wait_until`. Otherwise the broadcast becomes `paused`, even if funds arrive after the last check.\n- `paused`: Sending stopped because your balance cannot pay for more email, and it does not continue by itself. `funding_hold.reason` says why. Add funds, then resume the broadcast, or cancel it.\n- `sent`: Every recipient has been sent to.\n- `canceling`: A cancellation is under way and the remaining sends are stopping.\n- `canceled`: The cancellation finished. Anything already on its way to a recipient when you canceled cannot be pulled back.\n- `failed`: The broadcast could not be sent. Reading the broadcast gives `failure_reason`, which says why. If it had already started sending, the recipients it reached keep their delivery status and carry on producing events.\n\nA draft is deleted rather than canceled, because it was never sent. Recipients already sent to before a broadcast waits or pauses keep their delivery status, and are not sent to again when it continues.\n",
+    "Where the broadcast itself has got to. This is separate from what happened to individual recipients, which the broadcast's own `sent_count`, `delivered_count`, `bounced_count` and `complained_count` tell you. Those four are fields on the broadcast, not on everything that carries this status, and reading the broadcast's recipients or its events gives the same outcomes one recipient at a time.\n\nUse `can_start` in the send-allowance response to check whether email limits permit starting. A funding pause keeps the remaining recipients available for resumption; a failed broadcast cannot resume.\n\n- `draft`: Created, and not sent or scheduled yet.\n- `scheduled`: Due to send at `scheduled_at`. You can still edit it, and you can still change the time, right up until sending starts.\n- `accepted`: Taken for immediate sending. Nothing has gone out yet.\n- `sending`: On its way. Some recipients have been sent to and some have not.\n- `waiting_for_funds`: Sending stopped because your balance cannot pay for more email, or because the next batch would go over an email sending limit (`funding_hold.reason` is `send_limit_reached`). You can add funds manually or let your existing automatic top-up restore the balance. A sending limit allows more email when it resets. Bird checks once a minute and continues sending to the remaining recipients when a check succeeds before `funding_hold.wait_until`. Otherwise the broadcast becomes `paused`, even if funds or allowance arrive after the last check.\n- `paused`: Sending stopped for funds or a sending limit, and it does not continue by itself. `funding_hold.reason` says why. Check the balance and add funds if it is still short, or wait for the limit to allow more email, then resume the broadcast, or cancel it.\n- `sent`: Every recipient has been sent to.\n- `canceling`: A cancellation is under way and the remaining sends are stopping.\n- `canceled`: The cancellation finished. Anything already on its way to a recipient when you canceled cannot be pulled back.\n- `failed`: The broadcast could not be sent. Reading the broadcast gives `failure_reason`, which says why. If it had already started sending, the recipients it reached keep their delivery status and carry on producing events.\n\nA draft is deleted rather than canceled, because it was never sent. Recipients already sent to before a broadcast waits or pauses keep their delivery status, and are not sent to again when it continues.\n",
 } as const;
 
 export const AudienceIDSchema = {
@@ -9160,9 +9159,14 @@ export const EmailBroadcastTemplateSchema = {
 export const EmailBroadcastFundingHoldReasonSchema = {
   type: "string",
   minLength: 1,
-  enum: ["automatic_top_up", "funds_required", "wait_expired"],
+  enum: [
+    "automatic_top_up",
+    "funds_required",
+    "wait_expired",
+    "send_limit_reached",
+  ],
   description:
-    "Why sending stopped for funds.\n\n- `automatic_top_up`: Sending stopped while automatic top-up was active. Sending can continue automatically when a funding check succeeds before `wait_until`.\n- `funds_required`: Sending stopped because your balance cannot pay for more email. While `waiting_for_funds`, a manual or automatic top-up can restart sending before `wait_until`. If the broadcast is `paused`, add funds if needed, then resume it.\n- `wait_expired`: Status is `paused`. The automatic wait ended before sending continued. Add funds if needed, then resume the broadcast.\n",
+    "Why sending stopped for funds or a sending limit.\n\n- `automatic_top_up`: Sending stopped while automatic top-up was active. Sending can continue automatically when a funding check succeeds before `wait_until`.\n- `funds_required`: Sending stopped because your balance cannot pay for more email. While `waiting_for_funds`, a manual or automatic top-up can restart sending before `wait_until`. If the broadcast is `paused`, add funds if needed, then resume it.\n- `wait_expired`: Status is `paused`. The automatic wait ended before sending continued. Add funds if needed, then resume the broadcast.\n- `send_limit_reached`: Sending stopped because the next batch would go over one of your organization's email sending limits, such as its daily limit. While `waiting_for_funds`, Bird checks once a minute and continues sending if the limit allows the next batch before `wait_until`, such as after the daily limit resets at midnight UTC. If the broadcast is `paused`, the limit did not allow sending before `wait_until`. Resume it once the limit allows more email, or cancel it.\n",
 } as const;
 
 export const EmailBroadcastFundingHoldSchema = {
@@ -9171,7 +9175,7 @@ export const EmailBroadcastFundingHoldSchema = {
   additionalProperties: false,
   required: ["reason"],
   description:
-    "Why sending stopped for funds and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.\n\nThe send-allowance response includes `can_start` when waiting and resuming are available. If `can_start` is absent, do not assume a top-up can recover a broadcast or that a failed broadcast can resume.\n\nEach interruption can wait up to 20 minutes for funds. Checks, refused batches and partial top-ups during the same interruption do not extend its deadline. Automatic continuation or an explicit resume clears the hold; if sending later stops for funds again, a new 20-minute wait begins.\n",
+    "Why sending stopped for funds or a sending limit, and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.\n\nFor a funds hold, add funds during the wait to let sending continue automatically. After the broadcast pauses, check the balance and add funds if it is still short, then resume it explicitly. For `send_limit_reached`, adding funds does not help: sending continues when the limit allows more email, and after a pause you resume it once it does. Resume is refused while the next batch still cannot be paid for or would go over a sending limit. A failed broadcast cannot resume.\n\nEach interruption can wait up to 20 minutes for funds. An interruption for a sending limit (`send_limit_reached`) waits until 10 minutes after the next midnight UTC, when the daily limit resets. Checks, refused batches and partial top-ups during the same interruption do not extend its deadline. Automatic continuation or an explicit resume clears the hold; if sending later stops again, a new wait begins.\n",
   properties: {
     reason: {
       example: "funds_required",
@@ -9500,7 +9504,7 @@ export const EmailBroadcastSchema = {
       ],
       example: null,
       description:
-        "Why the broadcast failed. Set when `status` is `failed`, and `null` the rest of the time.\n\n- `empty_audience`: There was nobody to send to. Either the audience has no members, or every address in it is suppressed.\n- `audience_unavailable`: The audience no longer exists, so there was nothing to resolve.\n- `content_invalid`: The broadcast could not be set up to send. `failure_detail` explains what went wrong. It is one of these:\n  - The broadcast has no template, or the template it uses no longer exists. Choose an existing template and send the broadcast again.\n  - The template has no published version, or its published version has no subject and no body. Publish the template, or add content and publish it.\n  - The template uses a loop or reads a value that a broadcast cannot provide. Remove it, or use a contact property instead, then publish the template again.\n  - The template requires a language, but the broadcast has not selected one. Set `template.language` to one of the template's languages and send the broadcast again.\n  - The selected language is not available on the published template version. Choose one of that version's languages, or publish a version that includes the selected language.\n  - The sending domain is no longer verified. Verify the domain again.\n  - The configured IP pool has no usable IP address.\n  - We could not hand the prepared message to the delivery system. This is a problem on our side.\n- `insufficient_funds`: There was not enough in the workspace balance to pay for the send.\n- `quota_exceeded`: The send would have gone past your organization's daily or monthly email allowance, whichever runs out first. This can happen when the broadcast is being prepared, or partway through sending if the remaining recipients no longer fit. `failure_detail` gives you the count and the limit.\n- `internal_error`: Something went wrong on our side. Retry, and open a support ticket if it keeps happening.\n- `workspace_suspended`: The workspace is suspended, so the broadcast stopped sending. Recipients not yet sent to are not sent to, even after reactivation. Contact Bird support to reactivate the workspace.\n",
+        "Why the broadcast failed. Set when `status` is `failed`, and `null` the rest of the time. A failed broadcast cannot be sent again; once the cause is fixed, create a new broadcast.\n\n- `empty_audience`: There was nobody to send to. Either the audience has no members, or every address in it is suppressed.\n- `audience_unavailable`: The audience no longer exists, so there was nothing to resolve.\n- `content_invalid`: The broadcast could not be set up to send. `failure_detail` explains what went wrong. It is one of these:\n  - The broadcast has no template, or the template it uses no longer exists. Choose an existing template for the new broadcast.\n  - The template has no published version, or its published version has no subject and no body. Publish the template, or add content and publish it.\n  - The template uses a loop or reads a value that a broadcast cannot provide. Remove it, or use a contact property instead, then publish the template again.\n  - The template requires a language, but the broadcast has not selected one. Set `template.language` on the new broadcast to one of the template's languages.\n  - The selected language is not available on the published template version. Choose one of that version's languages, or publish a version that includes the selected language.\n  - The sending domain is no longer verified. Verify the domain again.\n  - The configured IP pool has no usable IP address.\n  - We could not hand the prepared message to the delivery system. This is a problem on our side.\n- `insufficient_funds`: There was not enough in the workspace balance to pay for the send.\n- `quota_exceeded`: The send would have gone past your organization's daily or monthly email allowance, whichever runs out first. This can happen when the broadcast is being prepared, or partway through sending if the remaining recipients no longer fit. `failure_detail` gives you the count and the limit.\n- `internal_error`: Something went wrong on our side. Open a support ticket if it keeps happening.\n- `workspace_suspended`: The workspace is suspended, so the broadcast stopped sending. Recipients not yet sent to are not sent to, even after reactivation. Contact Bird support to reactivate the workspace.\n",
     },
     failure_detail: {
       type: ["string", "null"],
@@ -10208,20 +10212,12 @@ export const EmailBroadcastCountAllowanceSchema = {
   },
 } as const;
 
-export const EmailBroadcastInsufficientFundsBehaviorSchema = {
-  type: "string",
-  minLength: 1,
-  enum: ["wait_for_top_up", "pause"],
-  description:
-    "When returned in the send-allowance response, this describes what a broadcast does if your balance runs out while it is sending. Recipients already sent to are not affected either way.\n\n- `wait_for_top_up`: The broadcast waits up to 20 minutes for a manual or automatic top-up. It checks once a minute and continues by itself when the insufficient-funds restriction clears, then pauses if the wait ends. Waiting does not change your automatic top-up settings or initiate a payment.\n- `pause`: The broadcast pauses until you add funds and resume it.\n",
-} as const;
-
 export const EmailBroadcastSendQuotaSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["recipients", "allowed", "limited_by"],
+  required: ["recipients", "allowed", "limited_by", "can_start"],
   description:
-    "The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.\n\nThe organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.\n\nServers that support funding recovery return `can_start`; callers with billing read access also receive `on_insufficient_funds`. If `can_start` is absent, use `allowed` to check the current allowance and do not assume automatic waiting or resumability. An absent field is different from `can_start: false`, which explicitly says the broadcast cannot start.\n\n`limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit. `on_insufficient_funds` says what happens if the balance runs out mid-send. Like `limit_reason`, it is present only when you have `org:billing` read access.\n",
+    "The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.\n\nThe organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.\n\nUse `can_start` to check whether the email limits let this broadcast start. If the balance runs out during sending, the broadcast waits up to 20 minutes and can continue automatically if enough funds become available during that wait. Otherwise it pauses until you resume it. It checks for funds once a minute. This does not enable automatic top-up or initiate a payment.\n\n`limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit.\n",
   example: {
     recipients: 12000,
     allowed: 5000,
@@ -10230,6 +10226,7 @@ export const EmailBroadcastSendQuotaSchema = {
     remaining: 7000,
     resets_at: "2026-09-01T00:00:00Z",
     limit_reason: "plan",
+    can_start: true,
     broadcasts: {
       limit: 20,
       remaining: 4,
@@ -10253,7 +10250,7 @@ export const EmailBroadcastSendQuotaSchema = {
       readOnly: true,
       example: 5000,
       description:
-        "Number of recipients covered by the organization's email send allowance at `send_at`, or now if you omit it. Equals `recipients` when no email limit restricts the send. It is lower when the remaining allowance cannot cover the audience.\n\nPartially covered broadcasts send in whole batches. This count is rounded down to a batch boundary and can be lower than `remaining`. Read this value directly instead of calculating it from `limit` and `remaining`.\n\nA value of 0 means no recipients are currently covered. This happens if the audience exceeds a full daily or funded monthly limit, if a temporary funding restriction blocks sending, or if the remaining allowance cannot cover a batch. When `can_start` is present, use it to decide whether a balance-limited broadcast can start and wait for funds. If it is absent, a zero allowance does not provide a way to send.\n",
+        "Number of recipients covered by the organization's email send allowance at `send_at`, or now if you omit it. Equals `recipients` when no email limit restricts the send. It is lower when the remaining allowance cannot cover the audience.\n\nPartially covered broadcasts send in whole batches. This count is rounded down to a batch boundary and can be lower than `remaining`. Read this value directly instead of calculating it from `limit` and `remaining`.\n\nA value of 0 means no recipients are currently covered. This happens if the audience exceeds a full daily or funded monthly limit, if a temporary funding restriction blocks sending, or if the remaining allowance cannot cover a batch. Use `can_start` to decide whether a broadcast with insufficient funds can start and wait for funds.\n",
     },
     limited_by: {
       readOnly: true,
@@ -10285,7 +10282,7 @@ export const EmailBroadcastSendQuotaSchema = {
       readOnly: true,
       example: "2026-09-01T00:00:00Z",
       description:
-        "When usage resets to 0 for the email limit identified by `limited_by`, evaluated at `send_at`, or now if you omit it.\n\nA broadcast sent before this time uses the same window and the allowance left after other sends. A broadcast sent at or after this time uses a new window. If `recipients` exceeds a full daily or funded monthly limit, the send is rejected in any window with that limit. When `limit_reason` is `unfunded`, the reported `limit` can instead be a temporary funding restriction; use `can_start`, when present, to determine whether the broadcast can start and wait for funds. Pass the later time as `send_at` to check whether the other email limit still restricts the send.\n\nOmitted when no email limit restricts the send, when the reset is at or before `send_at`, or when the billing period has ended and the next one has not started.\n",
+        "When usage resets to 0 for the email limit identified by `limited_by`, evaluated at `send_at`, or now if you omit it.\n\nA broadcast sent before this time uses the same window and the allowance left after other sends. A broadcast sent at or after this time uses a new window. If `recipients` exceeds a full daily or funded monthly limit, the send is rejected in any window with that limit. When `limit_reason` is `unfunded`, the reported `limit` can instead be a temporary funding restriction; use `can_start` to determine whether the broadcast can start and wait for funds. Pass the later time as `send_at` to check whether the other email limit still restricts the send.\n\nOmitted when no email limit restricts the send, when the reset is at or before `send_at`, or when the billing period has ended and the next one has not started.\n",
     },
     limit_reason: {
       readOnly: true,
@@ -10296,17 +10293,12 @@ export const EmailBroadcastSendQuotaSchema = {
       readOnly: true,
       $ref: "#/components/schemas/EmailBroadcastCountAllowance",
     },
-    on_insufficient_funds: {
-      readOnly: true,
-      example: "wait_for_top_up",
-      $ref: "#/components/schemas/EmailBroadcastInsufficientFundsBehavior",
-    },
     can_start: {
       type: "boolean",
       readOnly: true,
       example: true,
       description:
-        "When present, whether the organization's email limits let this broadcast start at `send_at`, or now if you omit it. This ignores a temporary funding restriction, including exhausted included volume when paid overage is available. It still checks daily limits and the monthly limit that applies after funding is restored.\n\nIt is `false` when no recipient fits the daily or funded monthly limits, including when the audience exceeds a full daily or funded monthly limit, or when usage has exhausted either limit. The response field `remaining` can instead reflect the temporary funding restriction: with `limit_reason: unfunded`, `remaining: 0` can accompany `can_start: true` if those daily and funded monthly limits allow sending. The broadcast can then start and wait for funds. A `true` value does not reserve allowance or promise that every recipient is sent. Other checks still apply when you send.\n",
+        "Whether the organization's email limits let this broadcast start at `send_at`, or now if you omit it. This ignores a temporary funding restriction, including exhausted included volume when paid overage is available. It still checks daily limits and the monthly limit that applies after funding is restored.\n\nIt is `false` when no recipient fits the daily or funded monthly limits, including when the audience exceeds a full daily or funded monthly limit, or when usage has exhausted either limit. The response field `remaining` can instead reflect the temporary funding restriction: with `limit_reason: unfunded`, `remaining: 0` can accompany `can_start: true` if those daily and funded monthly limits allow sending. The broadcast can then start and wait for funds. A `true` value does not reserve allowance or promise that every recipient is sent. Other checks still apply when you send.\n",
     },
   },
 } as const;
@@ -19552,6 +19544,39 @@ export const VerificationSchema = {
   ],
 } as const;
 
+export const VerificationCheckResultSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["success", "verification"],
+  properties: {
+    success: {
+      type: "boolean",
+      readOnly: true,
+      example: false,
+      description:
+        "Whether the submitted passcode verified this verification. `true` means the passcode was correct and the verification is now complete; `false` means it did not verify, and `reason` says why. A verification that has already reached a final state is no longer checkable and returns `404`.",
+    },
+    reason: {
+      type: ["string", "null"],
+      "x-extensible-enum": ["incorrect_code", "expired", "attempts_exhausted"],
+      readOnly: true,
+      description:
+        "Why the check did not succeed:\n\n- `incorrect_code`: The passcode was wrong and attempts remain.\n- `expired`: The validity window elapsed.\n- `attempts_exhausted`: Too many incorrect attempts were submitted.\n\n`null` when `success` is `true`. Treat unrecognized values as reasons added\nlater.",
+    },
+    verification: {
+      $ref: "#/components/schemas/Verification",
+    },
+    attempts_remaining: {
+      type: ["integer", "null"],
+      minimum: 0,
+      readOnly: true,
+      example: 2,
+      description:
+        "The number of check attempts left while the verification is still pending, or `null` once it has reached a final state.",
+    },
+  },
+} as const;
+
 export const VerificationOptionsSchema = {
   type: "object",
   additionalProperties: false,
@@ -19611,7 +19636,7 @@ export const VerificationCreateRequestSchema = {
       type: "object",
       additionalProperties: true,
       description:
-        "Optional key/value pairs to attach to the verification, for example a correlation id. Returned on the verification.",
+        "Optional key/value pairs to attach to the verification, for example a correlation id. Returned on the verification and copied onto the SMS, WhatsApp or email message that carries the code, so reads of that message and its webhooks return it too. The copy is skipped when the object is larger than 2 KB serialized.",
     },
   },
   example: {
@@ -19646,39 +19671,6 @@ export const VerificationCheckRequestSchema = {
       phone_number: "+15551234567",
     },
     code: "123456",
-  },
-} as const;
-
-export const VerificationCheckResultSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["success", "verification"],
-  properties: {
-    success: {
-      type: "boolean",
-      readOnly: true,
-      example: false,
-      description:
-        "Whether the submitted passcode verified this verification. `true` means the passcode was correct and the verification is now complete; `false` means it did not verify, and `reason` says why. A verification that has already reached a final state is no longer checkable and returns `404`.",
-    },
-    reason: {
-      type: ["string", "null"],
-      "x-extensible-enum": ["incorrect_code", "expired", "attempts_exhausted"],
-      readOnly: true,
-      description:
-        "Why the check did not succeed:\n\n- `incorrect_code`: The passcode was wrong and attempts remain.\n- `expired`: The validity window elapsed.\n- `attempts_exhausted`: Too many incorrect attempts were submitted.\n\n`null` when `success` is `true`. Treat unrecognized values as reasons added\nlater.",
-    },
-    verification: {
-      $ref: "#/components/schemas/Verification",
-    },
-    attempts_remaining: {
-      type: ["integer", "null"],
-      minimum: 0,
-      readOnly: true,
-      example: 2,
-      description:
-        "The number of check attempts left while the verification is still pending, or `null` once it has reached a final state.",
-    },
   },
 } as const;
 
@@ -21575,10 +21567,10 @@ export const WhatsAppTemplateSendSchema = {
     bid_multiplier: {
       type: "number",
       format: "double",
-      minimum: 0.01,
-      maximum: 100,
+      minimum: 0.1,
+      maximum: 2,
       description:
-        "Multiplies `optimization_spec.bid_amount` × country multiplier for this message. Range 0.01–100; default 1. Requires `optimization_spec` on a marketing template language.",
+        "Multiplies `optimization_spec.bid_amount` × country multiplier for this message. Range 0.1–2; default 1. Requires `optimization_spec` on a marketing template language. The result must stay at most 50000 (0.50 per delivery) for the recipient's country; a recipient without a known country is checked against the language's highest.",
       example: 0.8,
     },
     parameters: {
@@ -24880,8 +24872,9 @@ export const WhatsAppTemplateOptimizationSpecWriteSchema = {
       type: "integer",
       format: "int32",
       minimum: 1,
+      maximum: 50000,
       description:
-        "The maximum price per 1,000 deliveries, in the smallest unit of the account's currency. The reach estimate returns that currency as `currency_code`. 5000 is USD 0.05 per delivery.\n",
+        "The maximum price per 1,000 deliveries, in the smallest unit of the account's currency. The reach estimate returns that currency as `currency_code`. 5000 is USD 0.05 per delivery. At most 50000, which is 0.50 per delivery.\n",
       example: 5000,
     },
     bid_strategy: {
@@ -24896,12 +24889,12 @@ export const WhatsAppTemplateOptimizationSpecWriteSchema = {
       additionalProperties: {
         type: "number",
         format: "double",
-        minimum: 0.01,
-        maximum: 10,
-        description: "At least 0.01 and at most 10.",
+        minimum: 0.1,
+        maximum: 2,
+        description: "At least 0.1 and at most 2.",
       },
       description:
-        "Scales the bid for recipients in a country, keyed by ISO 3166-1 alpha-2 code. A country you leave out uses 1. Each write replaces the whole map.\n",
+        "Scales the bid for recipients in a country, keyed by ISO 3166-1 alpha-2 code. A country you leave out uses 1. Each write replaces the whole map. `bid_amount` times a country's multiplier must also be at most 50000.\n",
       example: {
         IN: 1.2,
         MX: 0.8,
@@ -37779,8 +37772,9 @@ export const EmailStatsQueryMetricSchema = {
 export const EmailStatsQueryDimensionSchema = {
   type: "string",
   description:
-    "Group by one recorded event dimension. Omit for a single ungrouped summary with optional series.\nGrouping by `tag` requires `filters.tag.name`.\nMissing values form a null group when the metric supports that dimension. A null value\nmeans the event lacks that attribution; it does not explain how the message was created\nor establish membership in another dimension such as a campaign.\n\nEvery selected metric must support the grouping dimension and every filter dimension.\nUnsupported combinations return validation error `E04074`, even when the workspace has no events.\n\n- `sending_domain`, `category`, `template_id`, `tag`: all metrics.\n- `recipient_domain`, `ip_pool_id`, `broadcast_id`: all metrics except `sends_accepted`.\n- `mailbox_provider`, `mailbox_provider_region`: all metrics except `sends_accepted`, `accepted`, and `rejected`.\n- `sending_ip`: `delivered`, `bounced`, `hard_bounced`, `soft_bounced`, `admin_bounced`, `block_bounced`,\n  `undetermined_bounced`, `deferred`, `oob_bounces`, `effective_delivered`, `all_bounces`, `delivery_rate`,\n  `bounce_rate`, `deferral_rate`, `oob_rate`, `total_p50_ms`, `total_p95_ms`, and `total_p99_ms`.\n- `country`, `region`, `city`, `agent_family`, `os_family`, `device_family`: `opens`, `opens_non_prefetched`,\n  `clicks`, `unique_opens`, `unique_opens_non_prefetched`, `unique_clicks`, `confirmed_unique_opens`,\n  and `confirmed_unique_opens_non_prefetched`.\n- `smtp_error_code`: `bounced`, `hard_bounced`, `soft_bounced`, `admin_bounced`, `block_bounced`, and `undetermined_bounced`.\n- `feedback_type`: `complained`.\n",
+    "Group by one recorded event dimension. Omit for a single ungrouped summary with optional series.\nGrouping by `tag` requires `filters.tag.name`.\nMissing values form a null group when the metric supports that dimension. A null value\nmeans the event lacks that attribution; it does not explain how the message was created\nor establish membership in another dimension such as a campaign.\n\nEvery selected metric must support the grouping dimension and every filter dimension.\nUnsupported combinations return validation error `E04074`, even when the workspace has no events.\n\n- `brand_id`, `sending_domain`, `category`, `template_id`, `tag`: all metrics. A null `brand_id` represents historical or unattributed traffic recorded without a Brand and is distinct from the workspace's default Brand.\n- `recipient_domain`, `ip_pool_id`, `broadcast_id`: all metrics except `sends_accepted`.\n- `mailbox_provider`, `mailbox_provider_region`: all metrics except `sends_accepted`, `accepted`, and `rejected`.\n- `sending_ip`: `delivered`, `bounced`, `hard_bounced`, `soft_bounced`, `admin_bounced`, `block_bounced`,\n  `undetermined_bounced`, `deferred`, `oob_bounces`, `effective_delivered`, `all_bounces`, `delivery_rate`,\n  `bounce_rate`, `deferral_rate`, `oob_rate`, `total_p50_ms`, `total_p95_ms`, and `total_p99_ms`.\n- `country`, `region`, `city`, `agent_family`, `os_family`, `device_family`: `opens`, `opens_non_prefetched`,\n  `clicks`, `unique_opens`, `unique_opens_non_prefetched`, `unique_clicks`, `confirmed_unique_opens`,\n  and `confirmed_unique_opens_non_prefetched`.\n- `smtp_error_code`: `bounced`, `hard_bounced`, `soft_bounced`, `admin_bounced`, `block_bounced`, and `undetermined_bounced`.\n- `feedback_type`: `complained`.\n",
   enum: [
+    "brand_id",
     "sending_domain",
     "category",
     "template_id",
@@ -37807,6 +37801,28 @@ export const EmailStatsQueryGrainSchema = {
   description:
     "Time buckets in the requested timezone. Weeks start on Monday; months start on the first day. Half days start at midnight and noon. Edge buckets count events inside the normalized period.",
   enum: ["quarter_hour", "hour", "half_day", "day", "week", "month"],
+} as const;
+
+export const EmailStatsQueryBrandFilterSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Match recorded Brand IDs using include or exclude. Include values combine with OR; exclusions remove matches. Missing values (`brand_id` null) survive exclude-only predicates. Brand listing is dashboard-only; copy a Brand ID from Brands > More actions > Copy brand ID in the dashboard, or ask the caller for the ID when only a Brand name is known. Supply a nonempty array; at most 20 distinct values across both arrays are accepted after normalization, with no overlap.",
+  properties: {
+    include: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/BrandID",
+      },
+    },
+    exclude: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/BrandID",
+      },
+    },
+  },
+  minProperties: 1,
 } as const;
 
 export const EmailStatsQueryStringFilterSchema = {
@@ -37962,6 +37978,9 @@ export const EmailStatsQueryFiltersSchema = {
   description:
     "Predicates on the context recorded for each event. Dimensions combine with AND. Unsupported metric and dimension combinations return 422, including for an empty workspace.",
   properties: {
+    brand_id: {
+      $ref: "#/components/schemas/EmailStatsQueryBrandFilter",
+    },
     sending_domain: {
       $ref: "#/components/schemas/EmailStatsQueryStringFilter",
     },
@@ -38071,7 +38090,7 @@ export const EmailStatsQueryRequestSchema = {
     filters: {
       $ref: "#/components/schemas/EmailStatsQueryFilters",
       description:
-        "Filter recorded event context with include/exclude predicates. Include values combine with OR; dimensions combine with AND. Exclude-only predicates retain missing values. Tag filters require one case-sensitive name; a name without values requires presence. Each predicate accepts at most 20 distinct values across include and exclude. Every selected metric must support every filter dimension, using the same compatibility rules as group_by. Resolve template and IP-pool names to IDs before filtering. Broadcast filters use IDs. Current names do not establish historical attribution.",
+        "Filter recorded event context with include/exclude predicates. Include values combine with OR; dimensions combine with AND. Exclude-only predicates retain missing values. Tag filters require one case-sensitive name; a name without values requires presence. Each predicate accepts at most 20 distinct values across include and exclude. Every selected metric must support every filter dimension, using the same compatibility rules as group_by. Resolve template and IP-pool names to IDs before filtering. Broadcast and Brand filters require IDs; copy a Brand ID from Brands > More actions > Copy brand ID in the dashboard, or ask the caller for the ID when only a Brand name is known. Current names do not establish historical attribution.",
     },
     sort: {
       $ref: "#/components/schemas/EmailStatsQueryMetric",
@@ -38110,6 +38129,18 @@ export const EmailStatsQueryDimensionsSchema = {
   description:
     "Contains the requested group_by property, including a null value when context is missing. Ungrouped results use an empty object.",
   properties: {
+    brand_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BrandID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Recorded Brand id value. Null represents historical or unattributed traffic recorded without a Brand and is distinct from the default Brand.",
+    },
     sending_domain: {
       type: ["string", "null"],
       description:
@@ -39575,6 +39606,133 @@ export const EmailStatsByBroadcastResponseSchema = {
         "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
+} as const;
+
+export const EmailStatsBrandPeriodSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The window this Brand breakdown was actually computed against. Bounds are either inclusive calendar days (YYYY-MM-DD in the requested `timezone`, UTC when omitted) or RFC 3339 UTC instants marking the starts of the first and last included 15-minute quarters (aligned to local quarter-hour boundaries when `timezone` is set).\n",
+  required: ["from", "to"],
+  properties: {
+    from: {
+      type: "string",
+      minLength: 1,
+      pattern:
+        "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2}))?$",
+      readOnly: true,
+      description:
+        "Inclusive start of the window the response covers. A calendar day (`YYYY-MM-DD`, in the requested `timezone`) for day windows, or an RFC 3339 UTC instant marking the start of the first included 15-minute quarter (aligned to a local quarter-hour boundary when `timezone` is set).",
+      example: "2026-10-15T09:00:00Z",
+    },
+    to: {
+      type: "string",
+      minLength: 1,
+      pattern:
+        "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2}))?$",
+      readOnly: true,
+      description:
+        "Inclusive end of the window the response covers. A calendar day (`YYYY-MM-DD`, in the requested `timezone`) for day windows, or an RFC 3339 UTC instant marking the start of the last included 15-minute quarter (covering the 15 minutes from this timestamp; aligned to a local quarter-hour boundary when `timezone` is set).",
+      example: "2026-10-15T09:30:00Z",
+    },
+    data_as_of: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "Always `null` for Brand breakdowns because they read retained reporting events directly rather than asynchronous rollups.",
+      example: null,
+    },
+  },
+} as const;
+
+export const EmailBrandStatsPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Delivery, engagement, and latency figures for one Brand's email traffic over the requested period, or for historical unbranded traffic when brand_id is null.",
+  required: ["brand_id", "delivery", "engagement", "latency"],
+  properties: {
+    brand_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BrandID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The Brand recorded at send time (`bnd_…`, copyable from Brands > More actions > Copy brand ID in the dashboard). Archived Brands continue to appear keyed by their ID. `null` represents historical or unattributed messages sent without a Brand and is distinct from the workspace's default Brand.\n",
+    },
+    delivery: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailDeliveryStats",
+        },
+      ],
+    },
+    engagement: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailEngagementStats",
+        },
+      ],
+    },
+    latency: {
+      readOnly: true,
+      description:
+        "Latency quantiles for this Brand. Retained reporting events populate `processing` and `total` quantiles; `delivery` quantiles are `null`.\n",
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailLatencyStats",
+        },
+      ],
+    },
+  },
+} as const;
+
+export const EmailStatsByBrandResponseSchema = {
+  unevaluatedProperties: false,
+  description:
+    "Per-Brand breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).",
+  allOf: [
+    {
+      type: "object",
+      required: ["period", "data", "total"],
+      properties: {
+        period: {
+          $ref: "#/components/schemas/EmailStatsBrandPeriod",
+          readOnly: true,
+          description:
+            "The resolved window the response covers (inclusive calendar dates in `YYYY-MM-DD`, or RFC 3339 starts of the first and last included 15-minute quarters), plus `data_as_of` (`null` because this breakdown reads retained reporting events directly).",
+        },
+        data: {
+          type: "array",
+          readOnly: true,
+          description:
+            "Brand breakdown rows, ranked by the `sort` metric (default `processed`) descending. Includes a row with `brand_id` set to `null` when historical unbranded traffic occurred in the period.",
+          items: {
+            $ref: "#/components/schemas/EmailBrandStatsPoint",
+          },
+        },
+        total: {
+          type: "integer",
+          minimum: 0,
+          readOnly: true,
+          description:
+            "Total number of distinct Brand groups with activity in the period (including the `null` unbranded group when present), regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.\n",
+          example: 4,
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
 } as const;
 
 export const EmailHealthSignalThresholdsSchema = {
@@ -53623,7 +53781,7 @@ export const VoiceLegRejectionReasonSchema = {
     "emergency_carrier_unavailable",
   ],
   description:
-    "Why we rejected the leg. Use `rejection_reason` to identify the cause;\n`sip_response_code` alone cannot distinguish these reasons. Treat an\nunrecognized value as a reason added later.\n\nYou can resolve these issues:\n\n- `source_not_allowed`: The leg came from an IP address that is not in the\n  trunk's allowed-address list. Add the address your PBX sends from.\n- `caller_id_not_verified`: The number in the `From` header is not a verified\n  caller ID for this workspace. Verify it or use a verified caller ID.\n- `number_ownership_not_verified`: The ownership documents for this purchased\n  number have not yet been accepted under its country's requirements. We\n  block outgoing and incoming legs on the number until verification is\n  complete. Blocked incoming legs never reach your PBX, and their route type\n  is `reject` regardless of the number's configuration. Open the number\n  under **Numbers** and complete its ownership requirements, then retry\n  the leg.\n- `destination_not_enabled`: Calling to this destination country is disabled.\n  Enable it in your voice destination settings.\n- `insufficient_balance`: Your wallet balance was too low for the leg.\n  Top up or enable automatic top-ups.\n- `daily_spend_exceeded`: The leg would exceed your organization's daily\n  voice spend limit. Retry after the limit resets at the start of the next\n  UTC day.\n- `concurrent_calls_exceeded`: You already have as many legs in progress as\n  your account allows. Wait for one to end or ask support to raise the limit.\n- `calls_per_second_exceeded`: You placed legs faster than your account\n  allows. Reduce your dialing rate and retry.\n- `sequence_paused`: The sequence receiving this call is paused. Resume it\n  to receive calls.\n- `sequence_archived`: The sequence receiving this call is archived. Route\n  the number to an available sequence.\n- `sequence_unpublished`: The sequence receiving this call has no active\n  publication. Publish it to receive calls.\n\n- `emergency_number_inactive`: The trunk's emergency number is not active, or\n  the workspace has no active emergency site for a browser call. Set up an\n  emergency site if needed. If the service is pending, wait for activation.\n  If it needs changes, complete the filing. If it was rejected or canceled,\n  start a new service or choose another emergency number.\n- `emergency_country_mismatch`: The dialed emergency number is not recognised\n  in the configured emergency site's country. Dial an emergency number for\n  that country or use another line.\n- `emergency_cap_exceeded`: The trunk already carries 10 emergency calls.\n  The 11th is refused until one ends.\n\nFor all other reasons, contact support and provide the leg `id`:\n\n- `routing_not_configured`: This trunk has no dial plan, which can happen on\n  a new trunk. For a SIP user's call, the trunk has no outbound routing, or\n  the phone dialled a number without a country code on a trunk with no\n  `country`: set the trunk's country or dial in international format.\n- `no_route_found`: A dial plan is attached, but no rule in it covers this\n  destination.\n- `destination_blocked`: The destination is blocked by our routing\n  configuration.\n- `call_not_permitted`: The leg could not be priced for your account.\n- `emergency_carrier_unavailable`: No carrier we use accepts emergency calls\n  from the trunk's emergency number.\n",
+    "Why we rejected the leg. Use `rejection_reason` to identify the cause;\n`sip_response_code` alone cannot distinguish these reasons. Treat an\nunrecognized value as a reason added later.\n\nYou can resolve these issues:\n\n- `source_not_allowed`: The leg came from an IP address that is not in the\n  trunk's allowed-address list. Add the address your PBX sends from.\n- `caller_id_not_verified`: The number in the `From` header is not a verified\n  caller ID for this workspace. Verify it or use a verified caller ID.\n- `number_ownership_not_verified`: Calls are blocked on this purchased number\n  while ownership or activation checks are incomplete. Refused incoming legs\n  do not reach your PBX and have route type `reject`. Find the number under\n  **Numbers** and follow its current ownership or activation step.\n- `destination_not_enabled`: Calling to this destination country is disabled.\n  Enable it in your voice destination settings.\n- `insufficient_balance`: Your wallet balance was too low for the leg.\n  Top up or enable automatic top-ups.\n- `daily_spend_exceeded`: The leg would exceed your organization's daily\n  voice spend limit. Retry after the limit resets at the start of the next\n  UTC day.\n- `concurrent_calls_exceeded`: You already have as many legs in progress as\n  your account allows. Wait for one to end or ask support to raise the limit.\n- `calls_per_second_exceeded`: You placed legs faster than your account\n  allows. Reduce your dialing rate and retry.\n- `sequence_paused`: The sequence receiving this call is paused. Resume it\n  to receive calls.\n- `sequence_archived`: The sequence receiving this call is archived. Route\n  the number to an available sequence.\n- `sequence_unpublished`: The sequence receiving this call has no active\n  publication. Publish it to receive calls.\n\n- `emergency_number_inactive`: The trunk's emergency number is not active, or\n  the workspace has no active emergency site for a browser call. Set up an\n  emergency site if needed. If the service is pending, wait for activation.\n  If it needs changes, complete the filing. If it was rejected or canceled,\n  start a new service or choose another emergency number.\n- `emergency_country_mismatch`: The dialed emergency number is not recognised\n  in the configured emergency site's country. Dial an emergency number for\n  that country or use another line.\n- `emergency_cap_exceeded`: The trunk already carries 10 emergency calls.\n  The 11th is refused until one ends.\n\nFor all other reasons, contact support and provide the leg `id`:\n\n- `routing_not_configured`: This trunk has no dial plan, which can happen on\n  a new trunk. For a SIP user's call, the trunk has no outbound routing, or\n  the phone dialled a number without a country code on a trunk with no\n  `country`: set the trunk's country or dial in international format.\n- `no_route_found`: A dial plan is attached, but no rule in it covers this\n  destination.\n- `destination_blocked`: The destination is blocked by our routing\n  configuration.\n- `call_not_permitted`: The leg could not be priced for your account.\n- `emergency_carrier_unavailable`: No carrier we use accepts emergency calls\n  from the trunk's emergency number.\n",
   example: "destination_not_enabled",
 } as const;
 
@@ -55320,6 +55478,9 @@ export const VoiceTrunkCoreSchema = {
     "workspace_id",
     "name",
     "domain",
+    "sip_trunking_enabled",
+    "did_delivery_enabled",
+    "workspace_users_enabled",
     "outbound_enabled",
     "inbound_enabled",
     "media_bypass",
@@ -55354,17 +55515,37 @@ export const VoiceTrunkCoreSchema = {
         "Full SIP address for this trunk, generated as `{trunk-id}.trunk.{region}.sip.bird.com`. This is the trunk's identity, so configure your PBX or SIP client to send calls to this address. It is derived from the trunk id and cannot be chosen or changed.\n",
       example: "01kxp5bb9qf878642atrf0xy5r.trunk.eu1.sip.bird.com",
     },
-    outbound_enabled: {
+    sip_trunking_enabled: {
       type: "boolean",
       readOnly: true,
       description:
-        "Whether this trunk may place calls: your PBX connects to us to dial out. Off on a new trunk. While it is off the trunk refuses every call attempt no matter what its allow lists say, and the connection and authentication settings below have no effect. Set `outbound_enabled` through the trunk update operation.\n",
+        "Whether your PBX may place calls through this trunk, admitted by `ip_acls` or `allowed_api_key_ids`. Off on a new trunk. While it is off, the allow lists admit no call. Set `sip_trunking_enabled` when you create the trunk or through the trunk update operation.\n",
+    },
+    did_delivery_enabled: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether this trunk may receive calls: we dial the addresses you declared, for the numbers this trunk answers. Off on a new trunk. Turning it off resets number routes that use this trunk to reject incoming calls. Turning it back on does not restore those routes. Set `did_delivery_enabled` when you create the trunk or through the trunk update operation.\n",
+    },
+    workspace_users_enabled: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether people in this workspace may place calls through this trunk with a session credential, from the dashboard phone, the CLI or MCP. Off on a new trunk. It grants nothing on its own: a call still has to present a credential issued to this workspace, and each one expires within minutes. Set `workspace_users_enabled` when you create the trunk or through the trunk update operation.\n",
+    },
+    outbound_enabled: {
+      type: "boolean",
+      readOnly: true,
+      deprecated: true,
+      description:
+        "Deprecated: read `sip_trunking_enabled` and `workspace_users_enabled` instead. `true` while any caller may place calls through this trunk.\n",
     },
     inbound_enabled: {
       type: "boolean",
       readOnly: true,
+      deprecated: true,
       description:
-        "Whether this trunk may receive calls: we dial the addresses you declared, for the numbers this trunk answers. Off on a new trunk. Turning it off resets number routes that use this trunk to reject incoming calls. Turning it back on does not restore those routes. Set `inbound_enabled` through the trunk update operation.\n",
+        "Deprecated: read `did_delivery_enabled`, which has the same value.",
     },
     media_bypass: {
       type: "boolean",
@@ -55376,7 +55557,7 @@ export const VoiceTrunkCoreSchema = {
       type: "array",
       readOnly: true,
       description:
-        "The trunk's IP allow list. IP filtering is active whenever this has at least one entry: calls admitted through the allow lists must come from those CIDR ranges. This restriction does not apply to session credentials when `session_credentials_enabled` is true. An empty list means no IP restriction. Replace the whole `ip_acls` list through the trunk update operation.\n",
+        "The trunk's IP allow list. IP filtering is active whenever this has at least one entry: calls admitted through the allow lists must come from those CIDR ranges. This restriction does not apply to session credentials when `workspace_users_enabled` is true. An empty list means no IP restriction. Replace the whole `ip_acls` list through the trunk update operation.\n",
       items: {
         $ref: "#/components/schemas/VoiceTrunkIPACL",
       },
@@ -55385,7 +55566,7 @@ export const VoiceTrunkCoreSchema = {
       type: "array",
       readOnly: true,
       description:
-        "The API keys allowed to authenticate this trunk over SIP Digest. A key must hold `voice` at write level and be neither revoked nor expired to authenticate. `ineligible_api_key_ids` names the entries that currently cannot. A nonempty list enables API-key authentication, limited to its eligible keys. An empty list means no API-key authentication. A trunk with empty `ip_acls` and `allowed_api_key_ids` lists accepts nothing when `session_credentials_enabled` is false. Replace the whole `allowed_api_key_ids` list through the trunk update operation.\n",
+        "The API keys allowed to authenticate this trunk over SIP Digest. A key must hold `voice` at write level and be neither revoked nor expired to authenticate. `ineligible_api_key_ids` names the entries that currently cannot. A nonempty list enables API-key authentication, limited to its eligible keys. An empty list means no API-key authentication. A trunk with empty `ip_acls` and `allowed_api_key_ids` lists accepts no call from your PBX. Replace the whole `allowed_api_key_ids` list through the trunk update operation.\n",
       items: {
         $ref: "#/components/schemas/APIKeyID",
       },
@@ -55404,7 +55585,7 @@ export const VoiceTrunkCoreSchema = {
       readOnly: true,
       minItems: 1,
       description:
-        'The Digest hash algorithms this trunk offers, in the order they are offered. We send one challenge line per algorithm and your PBX answers with the first it supports, so the order decides what most equipment picks. Always populated: a trunk with no explicit setting reports the default, `["SHA-256", "MD5"]`. The list governs clients that authenticate with an API key: their answer with an algorithm that is not on it is rejected, so narrowing the list also narrows what the trunk accepts from them. Session credentials, which the dashboard phone uses and `POST /v1/voice/session-credentials` creates, are the exception: with `session_credentials_enabled`, the challenge always ends with an MD5 line, after the list in its own order, and a valid session credential is accepted with MD5 or SHA-256. An API-key answer with that extra MD5 is still rejected. Replace `digest_algorithms` through the trunk update operation.\n',
+        'The Digest hash algorithms this trunk offers, in the order they are offered. We send one challenge line per algorithm and your PBX answers with the first it supports, so the order decides what most equipment picks. Always populated: a trunk with no explicit setting reports the default, `["SHA-256", "MD5"]`. The list governs clients that authenticate with an API key: their answer with an algorithm that is not on it is rejected, so narrowing the list also narrows what the trunk accepts from them. Session credentials, which the dashboard phone uses and `POST /v1/voice/session-credentials` creates, are the exception: with `workspace_users_enabled`, the challenge always ends with an MD5 line, after the list in its own order, and a valid session credential is accepted with MD5 or SHA-256. An API-key answer with that extra MD5 is still rejected. Replace `digest_algorithms` through the trunk update operation.\n',
       items: {
         $ref: "#/components/schemas/VoiceSIPDigestAlgorithm",
       },
@@ -55413,8 +55594,9 @@ export const VoiceTrunkCoreSchema = {
     session_credentials_enabled: {
       type: "boolean",
       readOnly: true,
+      deprecated: true,
       description:
-        "Whether a session credential may be used to connect to this trunk from a web browser, the CLI or MCP, alongside whatever the allow lists admit. Off by default. It grants nothing on its own: a call still has to present a credential issued to this workspace, and each one expires within minutes. Set `session_credentials_enabled` through the trunk update operation.\n",
+        "Deprecated: read `workspace_users_enabled`, which has the same value.",
     },
   },
 } as const;
@@ -55542,25 +55724,44 @@ export const VoiceTrunkCreateSchema = {
         "A human-readable label for this SIP trunk. Mutable, and distinct from the generated wire domain.",
       example: "Production PBX trunk",
     },
-    outbound_enabled: {
+    sip_trunking_enabled: {
       type: "boolean",
       default: false,
       description:
-        "Whether the new trunk may place calls. Omit it to create a trunk that does neither direction yet, and enable the ones you want once you know what the trunk is for. The settings below configure outbound, so send this as `true` alongside them.\n",
+        "Whether your PBX may place calls through the new trunk. Omit it to create a trunk that carries no calls yet, and turn on what you need once you know what the trunk is for.\n",
       example: true,
+    },
+    did_delivery_enabled: {
+      type: "boolean",
+      default: false,
+      description:
+        "Whether the new trunk may receive calls. A trunk receives no calls until it also has at least one gateway and at least one number, both added after create.\n",
+      example: true,
+    },
+    workspace_users_enabled: {
+      type: "boolean",
+      default: false,
+      description:
+        "Whether people in this workspace may place calls through the new trunk with a session credential, from the dashboard phone, the CLI or MCP. Omit it for a trunk reached only by a PBX.\n",
+      example: true,
+    },
+    outbound_enabled: {
+      type: "boolean",
+      deprecated: true,
+      description:
+        "Deprecated: use `sip_trunking_enabled`. `true` turns on `sip_trunking_enabled`; a request that also sends `sip_trunking_enabled: false` is rejected.\n",
     },
     inbound_enabled: {
       type: "boolean",
-      default: false,
+      deprecated: true,
       description:
-        "Whether the new trunk may receive calls. Omit it to create a trunk that does neither direction yet. A trunk receives no calls until it also has at least one gateway and at least one number, both added after create.\n",
-      example: true,
+        "Deprecated: use `did_delivery_enabled`. A request that sends both with different values is rejected.\n",
     },
     media_bypass: {
       type: "boolean",
       default: false,
       description:
-        "Whether we take ourselves out of the audio path for calls we forward to this trunk. Omit it to create the trunk with this off, which is what suits equipment behind NAT and any account that wants call recording. It is an inbound setting, so `true` is accepted only alongside `inbound_enabled: true`; `false` is always accepted. It can be changed later.\n",
+        "Whether we take ourselves out of the audio path for calls we forward to this trunk. Omit it to create the trunk with this off, which is what suits equipment behind NAT and any account that wants call recording. It is an inbound setting, so `true` is accepted only alongside `did_delivery_enabled: true`; `false` is always accepted. It can be changed later.\n",
       example: true,
     },
     media: {
@@ -55570,7 +55771,7 @@ export const VoiceTrunkCreateSchema = {
       type: "array",
       minItems: 1,
       description:
-        'The Digest hash algorithms to offer, in the order they should be offered. Omit this to use the default of `["SHA-256", "MD5"]`, which suits most equipment. Send `["MD5"]` for a PBX that only implements MD5 and rejects or ignores a challenge offering SHA-256 first. This governs clients that authenticate with an API key. Session credentials, including the dashboard phone\'s, are always offered MD5 as well and accepted with MD5 or SHA-256. This can be changed later without re-issuing credentials.\n',
+        'The Digest hash algorithms to offer, in the order they should be offered. Omit this to use the default of `["SHA-256", "MD5"]`, which suits most equipment. Send `["MD5"]` for a PBX that only implements MD5 and rejects or ignores a challenge offering SHA-256 first. This governs clients that authenticate with an API key. Session credentials, including the dashboard phone\'s, are always offered MD5 as well and accepted with MD5 or SHA-256. It applies to calls the trunk places, so send it alongside `sip_trunking_enabled` or `workspace_users_enabled` set to `true`. This can be changed later without re-issuing credentials.\n',
       items: {
         $ref: "#/components/schemas/VoiceSIPDigestAlgorithm",
       },
@@ -55578,10 +55779,9 @@ export const VoiceTrunkCreateSchema = {
     },
     session_credentials_enabled: {
       type: "boolean",
-      default: false,
+      deprecated: true,
       description:
-        "Whether a session credential may be used to connect to this trunk from a web browser, the CLI or MCP. Omit it to create the trunk with this off, which is what a trunk reached only by a PBX wants. It can be changed later.\n",
-      example: true,
+        "Deprecated: use `workspace_users_enabled`. A request that sends both with different values is rejected.\n",
     },
   },
 } as const;
@@ -55635,7 +55835,7 @@ export const VoiceTrunkUpdateSchema = {
   additionalProperties: false,
   minProperties: 1,
   description:
-    "A change to the trunk's directions, name, access control, and Digest algorithm\noffer. Every field is optional. An omitted field is left unchanged. The\n`ip_acls`, `allowed_api_key_ids`, and `digest_algorithms` fields each replace\ntheir whole list when present. Send an empty array to clear one. This lets you\ncommit the trunk's entire access configuration in one update.\n\nA direction has to be enabled before its settings can be set, but one update\ncan do both: enable a direction and send its configuration together.\n",
+    "A change to the trunk's caller switches, name, access control, and Digest\nalgorithm offer. Every field is optional. An omitted field is left unchanged. The\n`ip_acls`, `allowed_api_key_ids`, and `digest_algorithms` fields each replace\ntheir whole list when present. Send an empty array to clear one. This lets you\ncommit the trunk's entire access configuration in one update.\n\nThe access control and Digest settings need a switch that places calls, and\n`media_bypass` needs `did_delivery_enabled`. One update can do both: turn the\nswitch on and send its configuration together.\n",
   properties: {
     name: {
       type: "string",
@@ -55644,22 +55844,40 @@ export const VoiceTrunkUpdateSchema = {
         "A human-readable label for this SIP trunk. Mutable, and distinct from the generated wire domain.",
       example: "Production PBX trunk",
     },
-    outbound_enabled: {
+    sip_trunking_enabled: {
       type: "boolean",
       description:
-        "Whether this trunk may place calls. Turning it off stops the trunk admitting call attempts at the next call setup and leaves its connection and authentication settings stored, so turning it back on restores a working trunk. Omit the field to leave it unchanged.\n",
+        "Whether your PBX may place calls through this trunk. Turning it off stops the allow lists admitting calls at the next call setup and leaves them stored, so turning it back on restores a working trunk. Omit the field to leave it unchanged.\n",
       example: true,
+    },
+    did_delivery_enabled: {
+      type: "boolean",
+      description:
+        "Whether this trunk may receive calls. Turning it off resets number routes that use this trunk to reject incoming calls. Turning it back on does not restore those routes. Clear an attached emergency number in the dashboard before turning it off. The gateways remain configured. Omit the field to leave it unchanged.\n",
+      example: true,
+    },
+    workspace_users_enabled: {
+      type: "boolean",
+      description:
+        "Whether people in this workspace may place calls through this trunk with a session credential, from the dashboard phone, the CLI or MCP. Turning it off stops those calls at the next call setup without re-issuing anything. Omit the field to leave it unchanged.\n",
+      example: true,
+    },
+    outbound_enabled: {
+      type: "boolean",
+      deprecated: true,
+      description:
+        "Deprecated: use `sip_trunking_enabled` and `workspace_users_enabled`. `true` turns on `sip_trunking_enabled`. `false` stops every caller placing calls through this trunk. A request that also turns one of those switches the other way is rejected.\n",
     },
     inbound_enabled: {
       type: "boolean",
+      deprecated: true,
       description:
-        "Whether this trunk may receive calls. Turning it off resets number routes that use this trunk to reject incoming calls. Turning it back on does not restore those routes. Clear an attached emergency number in the dashboard before turning inbound off. The gateways remain configured. Omit the field to leave it unchanged.\n",
-      example: true,
+        "Deprecated: use `did_delivery_enabled`. A request that sends both with different values is rejected.\n",
     },
     media_bypass: {
       type: "boolean",
       description:
-        "Whether we take ourselves out of the audio path for calls we forward to this trunk. Turning it on takes effect at the next call setup and leaves calls already up untouched. It is an inbound setting, so the trunk must have `inbound_enabled` on; one update can do both. While it is on we cannot record those calls, report their audio quality, or end one because its audio stopped, and your equipment must be reachable for audio from the public internet. Turning it off puts us back in the path at the next call setup. Omit the field to leave it unchanged.\n",
+        "Whether we take ourselves out of the audio path for calls we forward to this trunk. Turning it on takes effect at the next call setup and leaves calls already up untouched. It is an inbound setting, so the trunk must have `did_delivery_enabled` on; one update can do both. While it is on we cannot record those calls, report their audio quality, or end one because its audio stopped, and your equipment must be reachable for audio from the public internet. Turning it off puts us back in the path at the next call setup. Omit the field to leave it unchanged.\n",
       example: true,
     },
     media: {
@@ -55692,9 +55910,9 @@ export const VoiceTrunkUpdateSchema = {
     },
     session_credentials_enabled: {
       type: "boolean",
+      deprecated: true,
       description:
-        "Whether a session credential may be used to connect to this trunk from a web browser, the CLI or MCP. Off by default; turning it on does not change what the allow lists admit, and turning it off stops those connections at the next call setup without re-issuing anything. Omit the field to leave it unchanged.\n",
-      example: true,
+        "Deprecated: use `workspace_users_enabled`. A request that sends both with different values is rejected.\n",
     },
   },
 } as const;
@@ -62940,7 +63158,7 @@ export const EmailBroadcastFundingHoldWritableSchema = {
   additionalProperties: false,
   required: ["reason"],
   description:
-    "Why sending stopped for funds and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.\n\nThe send-allowance response includes `can_start` when waiting and resuming are available. If `can_start` is absent, do not assume a top-up can recover a broadcast or that a failed broadcast can resume.\n\nEach interruption can wait up to 20 minutes for funds. Checks, refused batches and partial top-ups during the same interruption do not extend its deadline. Automatic continuation or an explicit resume clears the hold; if sending later stops for funds again, a new 20-minute wait begins.\n",
+    "Why sending stopped for funds or a sending limit, and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.\n\nFor a funds hold, add funds during the wait to let sending continue automatically. After the broadcast pauses, check the balance and add funds if it is still short, then resume it explicitly. For `send_limit_reached`, adding funds does not help: sending continues when the limit allows more email, and after a pause you resume it once it does. Resume is refused while the next batch still cannot be paid for or would go over a sending limit. A failed broadcast cannot resume.\n\nEach interruption can wait up to 20 minutes for funds. An interruption for a sending limit (`send_limit_reached`) waits until 10 minutes after the next midnight UTC, when the daily limit resets. Checks, refused batches and partial top-ups during the same interruption do not extend its deadline. Automatic continuation or an explicit resume clears the hold; if sending later stops again, a new wait begins.\n",
   properties: {
     reason: {
       example: "funds_required",
@@ -63109,7 +63327,7 @@ export const EmailBroadcastSendQuotaWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.\n\nThe organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.\n\nServers that support funding recovery return `can_start`; callers with billing read access also receive `on_insufficient_funds`. If `can_start` is absent, use `allowed` to check the current allowance and do not assume automatic waiting or resumability. An absent field is different from `can_start: false`, which explicitly says the broadcast cannot start.\n\n`limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit. `on_insufficient_funds` says what happens if the balance runs out mid-send. Like `limit_reason`, it is present only when you have `org:billing` read access.\n",
+    "The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.\n\nThe organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.\n\nUse `can_start` to check whether the email limits let this broadcast start. If the balance runs out during sending, the broadcast waits up to 20 minutes and can continue automatically if enough funds become available during that wait. Otherwise it pauses until you resume it. It checks for funds once a minute. This does not enable automatic top-up or initiate a payment.\n\n`limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit.\n",
   example: {
     recipients: 12000,
     allowed: 5000,
@@ -63118,6 +63336,7 @@ export const EmailBroadcastSendQuotaWritableSchema = {
     remaining: 7000,
     resets_at: "2026-09-01T00:00:00Z",
     limit_reason: "plan",
+    can_start: true,
     broadcasts: {
       limit: 20,
       remaining: 4,
@@ -67924,6 +68143,18 @@ export const EmailStatsQueryDimensionsWritableSchema = {
   description:
     "Contains the requested group_by property, including a null value when context is missing. Ungrouped results use an empty object.",
   properties: {
+    brand_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BrandID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Recorded Brand id value. Null represents historical or unattributed traffic recorded without a Brand and is distinct from the default Brand.",
+    },
     sending_domain: {
       type: ["string", "null"],
       description:
@@ -68451,6 +68682,24 @@ export const EmailStatsByBroadcastResponseWritableSchema = {
         "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
+} as const;
+
+export const EmailBrandStatsPointWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Delivery, engagement, and latency figures for one Brand's email traffic over the requested period, or for historical unbranded traffic when brand_id is null.",
+} as const;
+
+export const EmailStatsByBrandResponseWritableSchema = {
+  unevaluatedProperties: false,
+  description:
+    "Per-Brand breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).",
+  allOf: [
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
 } as const;
 
 export const EmailHealthWritableSchema = {

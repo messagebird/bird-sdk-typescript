@@ -140,6 +140,14 @@ export async function emailStatsByTemplate() {
   for (const row of data) console.log(row.template_id, row.engagement.open_rate);
 }
 
+export async function emailStatsByBrand() {
+  const { data } = await bird.email.stats.byBrand({
+    sort: "open_rate",
+    limit: 25,
+  });
+  for (const row of data) console.log(row.brand_id, row.engagement.open_rate);
+}
+
 export async function emailStatsByLocation() {
   const { data } = await bird.email.stats.byLocation({
     from: "2026-05-01",

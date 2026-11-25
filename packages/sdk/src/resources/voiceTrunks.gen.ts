@@ -11,7 +11,7 @@ export type VoiceTrunksUpdateParams = NonNullable<UpdateVoiceTrunkData["body"]>;
 
 export class VoiceTrunksResourceBase extends Resource {
   /**
-   * List the workspace's SIP trunks as a cursor page. Each carries the Bird-assigned `domain` the customer's equipment sends calls to. The `ip_acls` and `allowed_api_key_ids` fields control which calls are admitted; a trunk with both empty admits nothing when `session_credentials_enabled` is false. Keys listed in `ineligible_api_key_ids` cannot authenticate even though they remain bound to the trunk.
+   * List the workspace's SIP trunks as a cursor page. Each carries the Bird-assigned `domain` the customer's equipment sends calls to. The `ip_acls` and `allowed_api_key_ids` fields admit the customer's PBX calls while `sip_trunking_enabled` is on; with both empty they admit none. Keys listed in `ineligible_api_key_ids` cannot authenticate even though they remain bound to the trunk.
    *
    * @example Find the trunk a call arrives on
    * for await (const trunk of bird.voice.trunks.list()) {
@@ -29,7 +29,7 @@ export class VoiceTrunksResourceBase extends Resource {
    *
    * @example Read one trunk's configuration
    * const trunk = await bird.voice.trunks.get("trunk-id");
-   * console.log(trunk.name, trunk.inbound_enabled, trunk.outbound_enabled);
+   * console.log(trunk.name, trunk.did_delivery_enabled, trunk.sip_trunking_enabled);
    */
   get(trunkId: string, options?: RequestOptions): APIPromise<VoiceTrunk> {
     return this.call<VoiceTrunk>("GET", options, ({ signal, headers }) =>
@@ -42,8 +42,8 @@ export class VoiceTrunksResourceBase extends Resource {
    * @example Register a SIP trunk
    * const trunk = await bird.voice.trunks.create({
    *   name: "Lisbon office",
-   *   outbound_enabled: true,
-   *   inbound_enabled: true,
+   *   sip_trunking_enabled: true,
+   *   did_delivery_enabled: true,
    * });
    * console.log(trunk.id, trunk.domain);
    */
@@ -53,7 +53,7 @@ export class VoiceTrunksResourceBase extends Resource {
   }
 
   /**
-   * Change a SIP trunk's directions, name, access control and Digest offer. A direction has to be enabled before its settings can be set, and one update can do both, so this is the operation that clears `VoiceTrunkOutboundNotEnabled` and `VoiceTrunkInboundNotEnabled`. The `ip_acls`, `allowed_api_key_ids` and `digest_algorithms` fields each REPLACE their whole list, so read `voice.trunks.get` first and send the list you want to end up with. An empty array clears an allow list; an empty `digest_algorithms` array restores the default offer. Turning `inbound_enabled` off returns numbers routed to this trunk to the workspace default inbound route, and resets a default that names it to reject. If an emergency number is attached, clear it in the dashboard before turning inbound off. Turning it back on does not restore those routes, so confirm that change with the user first.
+   * Change a SIP trunk's caller switches, name, access control and Digest offer. A switch has to be on before its settings can be set, and one update can do both, so this is the operation that clears `VoiceTrunkOutboundNotEnabled` and `VoiceTrunkInboundNotEnabled`. The `ip_acls`, `allowed_api_key_ids` and `digest_algorithms` fields each REPLACE their whole list, so read `voice.trunks.get` first and send the list you want to end up with. An empty array clears an allow list; an empty `digest_algorithms` array restores the default offer. Turning `did_delivery_enabled` off returns numbers routed to this trunk to the workspace default inbound route, and resets a default that names it to reject. If an emergency number is attached, clear it in the dashboard before turning `did_delivery_enabled` off. Turning it back on does not restore those routes, so confirm that change with the user first.
    *
    * @example Replace a trunk's IP allow list
    * const trunk = await bird.voice.trunks.update("spt_01krdgeqcxet5s7t44vh8rt9mg", {

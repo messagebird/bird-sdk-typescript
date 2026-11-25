@@ -54,6 +54,7 @@ describe("bird.email.stats breakdowns", () => {
       ["byMailboxProvider", /\/stats\/mailbox-providers$/],
       ["byMailboxProviderRegion", /\/stats\/mailbox-provider-regions$/],
       ["byTemplate", /\/stats\/templates$/],
+      ["byBrand", /\/stats\/brands$/],
       ["byLocation", /\/stats\/locations$/],
       ["byClient", /\/stats\/clients$/],
       ["byBounceCode", /\/stats\/bounce-codes$/],

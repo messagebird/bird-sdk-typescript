@@ -47,15 +47,15 @@ export async function voiceSessionCredentialsCreate() {
 export async function voiceTrunksCreate() {
   const trunk = await bird.voice.trunks.create({
     name: "Lisbon office",
-    outbound_enabled: true,
-    inbound_enabled: true,
+    sip_trunking_enabled: true,
+    did_delivery_enabled: true,
   });
   console.log(trunk.id, trunk.domain);
 }
 
 export async function voiceTrunksGet() {
   const trunk = await bird.voice.trunks.get("trunk-id");
-  console.log(trunk.name, trunk.inbound_enabled, trunk.outbound_enabled);
+  console.log(trunk.name, trunk.did_delivery_enabled, trunk.sip_trunking_enabled);
 }
 
 export async function voiceTrunksDelete() {

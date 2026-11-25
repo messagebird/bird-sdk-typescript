@@ -610,6 +610,9 @@ import type {
   GetEmailStatsByBounceCodeData,
   GetEmailStatsByBounceCodeErrors,
   GetEmailStatsByBounceCodeResponses,
+  GetEmailStatsByBrandData,
+  GetEmailStatsByBrandErrors,
+  GetEmailStatsByBrandResponses,
   GetEmailStatsByBroadcastData,
   GetEmailStatsByBroadcastErrors,
   GetEmailStatsByBroadcastResponses,
@@ -2599,7 +2602,9 @@ export const getEmailBroadcastCounts = <ThrowOnError extends boolean = false>(
  *
  * `recipients` is the number of contacts the broadcast could reach now. It matches the sendable count from the audience counts. `allowed` is the number covered by the email send allowance. It equals `recipients` when no email limit restricts the send. `limited_by` identifies the monthly email limit for the billing period or the daily email limit that prevents the rest from receiving the broadcast. `limit` and `remaining` describe that email limit. `resets_at` is its reset time. For a monthly email limit, `limit_reason` explains what sets it if you can read the organization's billing.
  *
- * When present, `can_start` takes precedence over these allowance counts when deciding whether email limits permit starting. A temporary funding restriction can produce `allowed: 0` or `remaining: 0` while `can_start: true`; the broadcast can start and wait for funds. Full daily and funded monthly limits still apply. If `can_start` is absent, use `allowed` and do not assume waiting is supported. Other send checks still apply.
+ * `can_start` takes precedence over these allowance counts when deciding whether email limits permit starting. A temporary funding restriction can produce `allowed: 0` or `remaining: 0` while `can_start: true`; the broadcast can start and wait for funds. Full daily and funded monthly limits still apply. Other send checks still apply.
+ *
+ * If the balance runs out while sending, the broadcast waits up to 20 minutes, checking once a minute, and continues by itself if a check before the wait ends finds enough funds for the next batch and its sending setup is usable. Otherwise it pauses until you resume it. Other send limits are checked again when sending continues. Waiting does not initiate a payment or change automatic top-up settings.
  *
  * Pass `send_at` to check a later send, such as the `scheduled_at` you plan to use. If a daily or monthly window resets by that time, the check uses its full allowance. Otherwise, it uses the allowance remaining now. The check estimates your send quota using current limits without subtracting broadcasts that are scheduled but have not sent yet, so broadcasts scheduled for the same period may together exceed the limit even if each check shows enough quota. Without `send_at`, it checks a send now.
  *
@@ -2642,6 +2647,8 @@ export const getEmailBroadcastSendQuota = <
  * Returns recipient-level delivery state for a broadcast, paginated. This is who a broadcast reached and how far each one got.
  *
  * The list is empty for a draft, scheduled, or accepted broadcast: recipients are resolved from the audience only once sending begins. Pass `to` to return just that address's row, which is how you answer "did this person get it?" on a send too large to page through.
+ *
+ * The list is kept for 30 days after the broadcast is sent, fails or is canceled. After that, this returns `410` with `BroadcastRecipientsExpired`, while the broadcast itself stays readable, with its saved counts when they are available.
  *
  */
 export const listEmailBroadcastRecipients = <
@@ -13047,6 +13054,40 @@ export const getEmailStatsByBroadcast = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/email/stats/broadcasts",
+    ...options,
+  });
+
+/**
+ * Get statistics by Brand
+ *
+ * Returns aggregate delivery, engagement, and latency counts grouped by the Brand each message was sent with, so each Brand's deliverability and engagement can be compared side by side. Attribution uses the Brand recorded at send time. Archived Brands retain their historical activity keyed by their ID. Historical or unattributed messages recorded without a Brand appear in a separate row with `brand_id` set to `null` rather than being merged into the default Brand.
+ *
+ * Rows are ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, hard maximum 200). Rows are computed against event time (not send time), so engagement received during the period for messages sent earlier is included. Preserve `from`, `to`, `sort`, and `timezone` when following `next_cursor` or `prev_cursor`; if the first request omitted `from` or `to`, pass the returned `period.from` and `period.to` on continuation so the cursor stays valid across local midnight.
+ *
+ * This endpoint reads retained reporting events directly (`data_as_of` is `null`), covering up to the last 180 days starting on or after `2026-09-23T00:00:00Z`. Requesting dates before the available history boundary returns `422` (`E04072`). When drilling down into a single Brand with `POST /v1/email/stats/query`, use local today or earlier for `to` (since `POST /v1/email/stats/query` rejects future calendar dates).
+ *
+ */
+export const getEmailStatsByBrand = <ThrowOnError extends boolean = false>(
+  options?: Options<GetEmailStatsByBrandData, ThrowOnError>,
+): RequestResult<
+  GetEmailStatsByBrandResponses,
+  GetEmailStatsByBrandErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetEmailStatsByBrandResponses,
+    GetEmailStatsByBrandErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/stats/brands",
     ...options,
   });
 
