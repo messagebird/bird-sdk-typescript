@@ -6582,9 +6582,10 @@ export const listWorkspaceSmsSenderRequirements = <
  * in progress returns `503`; retry later. A registration that already exists for the country and is
  * neither rejected nor suspended returns `409`, and that includes one still `pending` review; a
  * rejected registration is resubmitted, and a suspended one reactivated, by calling this again.
- * A `409` can also mean the contract's billing frequency changed just before the call: a priced
- * sender's setup fee is then charged and no registration is kept, so retrying pays it again;
- * contact support instead.
+ * A `409` can also mean the contract's billing frequency changed just before the call. When that
+ * `409`, or a `402`, arrives after a priced sender's setup fee was charged, the registration is
+ * kept as `suspended`: call this again to reactivate it, and the setup fee is not charged a second
+ * time.
  *
  * A sender covered by a dedicated program, such as a US 10DLC campaign or toll-free
  * verification, returns `422` and must use that program instead. Short-code registrations
@@ -17610,8 +17611,8 @@ export const createVoiceRingGroupMember = <
 /**
  * Remove a member from a ring group
  *
- * Removes the user from the ring group. A call already ringing the user is
- * not affected. Removing a member of the default group returns
+ * Removes the member from the ring group. A call already ringing the
+ * member is not affected. Removing a member of the default group returns
  * `409 Conflict`.
  *
  */
@@ -17637,7 +17638,7 @@ export const deleteVoiceRingGroupMember = <
         type: "apiKey",
       },
     ],
-    url: "/v1/voice/ring-groups/{ring_group_id}/members/{user_id}",
+    url: "/v1/voice/ring-groups/{ring_group_id}/members/{member_id}",
     ...options,
   });
 

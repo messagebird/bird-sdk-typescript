@@ -41,8 +41,8 @@ export class VoiceRingGroupsMembersResource extends Resource {
    * @example Remove a member from a ring group
    * await bird.voice.ringGroups.members.delete("RING_GROUP_ID", "USER_ID");
    */
-  delete(ringGroupId: string, userId: string, options?: RequestOptions): APIPromise<void> {
+  delete(ringGroupId: string, memberId: string, options?: RequestOptions): APIPromise<void> {
     return this.call<void>("DELETE", options, ({ signal, headers }) =>
-      deleteVoiceRingGroupMember({ client: this.client, path: { ring_group_id: ringGroupId, user_id: userId }, headers, signal }));
+      deleteVoiceRingGroupMember({ client: this.client, path: { ring_group_id: ringGroupId, member_id: memberId }, headers, signal }));
   }
 }

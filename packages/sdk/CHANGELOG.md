@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.149.0
+
+- Ring group members now carry `type`, which is `user` for a workspace user; add it where you build a member object yourself, such as in a test fixture.
+
 ## 0.148.0
 
 - **Breaking:** listing or exporting a broadcast's recipients, for email and WhatsApp, now fails with a gone error once the broadcast finished more than 30 days ago; save any recipient rows you need before then, and treat the error as permanent.

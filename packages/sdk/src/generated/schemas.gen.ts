@@ -48181,7 +48181,7 @@ export const WebhookEndpointUpdateSchema = {
       },
       minItems: 1,
       description:
-        "Replaces all event subscriptions with this list. Omit to keep the current set. Types outside the event catalog return a `422`.\n",
+        "Replaces all event subscriptions with this list. Omit to keep the current set. Types outside the event catalog return a `422`, except a type the endpoint already subscribes to that has since left the catalog: it can stay in the list.\n",
       example: ["email.delivered", "email.bounced", "email.complained"],
     },
     destination: {
@@ -48219,7 +48219,7 @@ export const WebhookTestRequestSchema = {
     event_type: {
       type: "string",
       description:
-        "Event type to simulate. Any type from the event catalog is accepted, whether or not the endpoint subscribes to it; an unknown type returns a `422`. When omitted, the endpoint's first subscribed event type is used.\n",
+        "Event type to simulate. Any type from the event catalog is accepted, whether or not the endpoint subscribes to it; an unknown type returns a `422`. When omitted, the endpoint's first subscribed event type that is still in the catalog is used. An endpoint with no subscribed event types returns a `412`; one whose subscribed types have all left the catalog returns a `422`.\n",
       example: "email.delivered",
     },
   },
@@ -57015,13 +57015,18 @@ export const VoiceRingGroupUpdateSchema = {
   },
 } as const;
 
-export const VoiceRingGroupMemberSchema = {
+export const VoiceRingGroupUserMemberSchema = {
   type: "object",
   additionalProperties: false,
   description:
     "A user added to a ring group. A member who later leaves the workspace stays listed until removed, but the group never rings them.",
-  required: ["user_id", "created_at"],
+  required: ["type", "user_id", "created_at"],
   properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      const: "user",
+    },
     user_id: {
       readOnly: true,
       $ref: "#/components/schemas/UserID",
@@ -57034,6 +57039,21 @@ export const VoiceRingGroupMemberSchema = {
       description:
         "When the user joined the ring group. Null for the default group, whose members are the users online now.",
       example: "2026-10-01T12:00:00Z",
+    },
+  },
+} as const;
+
+export const VoiceRingGroupMemberSchema = {
+  description: "A ring group member. `type` names what kind of member it is.",
+  oneOf: [
+    {
+      $ref: "#/components/schemas/VoiceRingGroupUserMember",
+    },
+  ],
+  discriminator: {
+    propertyName: "type",
+    mapping: {
+      user: "#/components/schemas/VoiceRingGroupUserMember",
     },
   },
 } as const;
@@ -57059,7 +57079,7 @@ export const VoiceRingGroupMemberListSchema = {
 export const VoiceRingGroupMemberCreateSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["user_id"],
+  description: "The member to add.",
   properties: {
     user_id: {
       $ref: "#/components/schemas/UserID",
@@ -57067,6 +57087,7 @@ export const VoiceRingGroupMemberCreateSchema = {
         "The workspace user to add. `bird members list` and the `members_list` MCP tool list workspace members in pages, each with its `user.id`; follow `next_cursor` until the user appears. Both need the `members` scope at read level.",
     },
   },
+  required: ["user_id"],
 } as const;
 
 export const EsimZoneIDSchema = {
@@ -71116,7 +71137,7 @@ export const WebhookEndpointUpdateWritableSchema = {
       },
       minItems: 1,
       description:
-        "Replaces all event subscriptions with this list. Omit to keep the current set. Types outside the event catalog return a `422`.\n",
+        "Replaces all event subscriptions with this list. Omit to keep the current set. Types outside the event catalog return a `422`, except a type the endpoint already subscribes to that has since left the catalog: it can stay in the list.\n",
       example: ["email.delivered", "email.bounced", "email.complained"],
     },
     destination: {
@@ -74607,6 +74628,36 @@ export const VoiceRingGroupListWritableSchema = {
   },
 } as const;
 
+export const VoiceRingGroupUserMemberWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A user added to a ring group. A member who later leaves the workspace stays listed until removed, but the group never rings them.",
+  required: ["type"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      const: "user",
+    },
+  },
+} as const;
+
+export const VoiceRingGroupMemberWritableSchema = {
+  description: "A ring group member. `type` names what kind of member it is.",
+  oneOf: [
+    {
+      $ref: "#/components/schemas/VoiceRingGroupUserMemberWritable",
+    },
+  ],
+  discriminator: {
+    propertyName: "type",
+    mapping: {
+      user: "#/components/schemas/VoiceRingGroupUserMemberWritable",
+    },
+  },
+} as const;
+
 export const VoiceRingGroupMemberListWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -74616,6 +74667,9 @@ export const VoiceRingGroupMemberListWritableSchema = {
   properties: {
     data: {
       type: "array",
+      items: {
+        $ref: "#/components/schemas/VoiceRingGroupMemberWritable",
+      },
       description:
         "The members, in the order they joined; the default group's online users, by user ID.",
     },

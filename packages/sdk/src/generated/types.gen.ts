@@ -26417,7 +26417,7 @@ export type WebhookEndpointUpdate = {
    */
   filter?: WebhookFilter | null;
   /**
-   * Replaces all event subscriptions with this list. Omit to keep the current set. Types outside the event catalog return a `422`.
+   * Replaces all event subscriptions with this list. Omit to keep the current set. Types outside the event catalog return a `422`, except a type the endpoint already subscribes to that has since left the catalog: it can stay in the list.
    *
    */
   events?: Array<WebhookEventType>;
@@ -26439,7 +26439,7 @@ export type WebhookRotateSecretResponse = {
 
 export type WebhookTestRequest = {
   /**
-   * Event type to simulate. Any type from the event catalog is accepted, whether or not the endpoint subscribes to it; an unknown type returns a `422`. When omitted, the endpoint's first subscribed event type is used.
+   * Event type to simulate. Any type from the event catalog is accepted, whether or not the endpoint subscribes to it; an unknown type returns a `422`. When omitted, the endpoint's first subscribed event type that is still in the catalog is used. An endpoint with no subscribed event types returns a `412`; one whose subscribed types have all left the catalog returns a `422`.
    *
    */
   event_type?: string;
@@ -31431,7 +31431,8 @@ export type VoiceRingGroupUpdate = {
 /**
  * A user added to a ring group. A member who later leaves the workspace stays listed until removed, but the group never rings them.
  */
-export type VoiceRingGroupMember = {
+export type VoiceRingGroupUserMember = {
+  type: "user";
   /**
    * The member's user ID.
    */
@@ -31443,6 +31444,11 @@ export type VoiceRingGroupMember = {
 };
 
 /**
+ * A ring group member. `type` names what kind of member it is.
+ */
+export type VoiceRingGroupMember = VoiceRingGroupUserMember;
+
+/**
  * The ring group's members. Not paginated: a ring group holds at most 200 members, and the default group's members are the workspace's online users.
  */
 export type VoiceRingGroupMemberList = {
@@ -31452,6 +31458,9 @@ export type VoiceRingGroupMemberList = {
   data: Array<VoiceRingGroupMember>;
 };
 
+/**
+ * The member to add.
+ */
 export type VoiceRingGroupMemberCreate = {
   /**
    * The workspace user to add. `bird members list` and the `members_list` MCP tool list workspace members in pages, each with its `user.id`; follow `next_cursor` until the user appears. Both need the `members` scope at read level.
@@ -38795,7 +38804,7 @@ export type WebhookEndpointUpdateWritable = {
    */
   filter?: WebhookFilter | null;
   /**
-   * Replaces all event subscriptions with this list. Omit to keep the current set. Types outside the event catalog return a `422`.
+   * Replaces all event subscriptions with this list. Omit to keep the current set. Types outside the event catalog return a `422`, except a type the endpoint already subscribes to that has since left the catalog: it can stay in the list.
    *
    */
   events?: Array<WebhookEventType>;
@@ -40568,13 +40577,25 @@ export type VoiceRingGroupListWritable = {
 };
 
 /**
+ * A user added to a ring group. A member who later leaves the workspace stays listed until removed, but the group never rings them.
+ */
+export type VoiceRingGroupUserMemberWritable = {
+  type: "user";
+};
+
+/**
+ * A ring group member. `type` names what kind of member it is.
+ */
+export type VoiceRingGroupMemberWritable = VoiceRingGroupUserMemberWritable;
+
+/**
  * The ring group's members. Not paginated: a ring group holds at most 200 members, and the default group's members are the workspace's online users.
  */
 export type VoiceRingGroupMemberListWritable = {
   /**
    * The members, in the order they joined; the default group's online users, by user ID.
    */
-  data: Array<unknown>;
+  data: Array<VoiceRingGroupMemberWritable>;
 };
 
 /**
@@ -82356,12 +82377,12 @@ export type DeleteVoiceRingGroupMemberData = {
      */
     ring_group_id: VoiceRingGroupId;
     /**
-     * ID of the member to remove.
+     * ID of the member to remove, as `GET` on the members lists it.
      */
-    user_id: UserId;
+    member_id: string;
   };
   query?: never;
-  url: "/v1/voice/ring-groups/{ring_group_id}/members/{user_id}";
+  url: "/v1/voice/ring-groups/{ring_group_id}/members/{member_id}";
 };
 
 export type DeleteVoiceRingGroupMemberErrors = {
