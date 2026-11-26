@@ -19760,6 +19760,27 @@ export const WhatsAppTemplateExampleParameterSchema = {
   },
 } as const;
 
+export const WhatsAppTemplateSupportedAppSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "An Android app that receives the passcode from a `one_tap` or `zero_tap` button.",
+  properties: {
+    package_name: {
+      type: "string",
+      readOnly: true,
+      description: "The app's Android application ID.",
+      example: "com.example.otpapp",
+    },
+    signature_hash: {
+      type: "string",
+      readOnly: true,
+      description: "The 11-character hash of the app's signing key.",
+      example: "K8a/AINcGX7",
+    },
+  },
+} as const;
+
 export const WhatsAppTemplateButtonSchema = {
   type: "object",
   additionalProperties: false,
@@ -19778,17 +19799,41 @@ export const WhatsAppTemplateButtonSchema = {
         "request_contact_info",
       ],
       description:
-        "The button's behavior.\n\n- `url`: opens a link.\n- `quick_reply`: sends its own label back to you as an inbound message.\n- `phone_number`: dials the number it carries.\n- `otp`: copies a one-time passcode. It belongs only on an authentication\n  template, and that template takes no other button type.\n- `copy_code`: copies a coupon code to the recipient's clipboard. It\n  belongs only on a marketing template, which takes at most one.\n- `request_contact_info`: asks the recipient to share the phone number\n  their WhatsApp account carries. It belongs only on a utility or\n  marketing template, as that template's only button.\n\nThis is an open enum. Accept unrecognized values.\n",
+        "The button's behavior.\n\n- `url`: opens a link.\n- `quick_reply`: sends its own label back to you as an inbound message.\n- `phone_number`: dials the number it carries.\n- `otp`: delivers a one-time passcode, in the way its `otp_type` names.\n  It belongs only on an authentication template, and that template\n  takes no other button type. Once the language is submitted, WhatsApp\n  returns this button as a `url` button whose address names the\n  delivery type, so a submitted language reads back with `url`. It\n  also adds a `quick_reply` button labeled `I didn't request a code`,\n  which the preview shows too.\n- `copy_code`: copies a coupon code to the recipient's clipboard. It\n  belongs only on a marketing template, which takes at most one.\n- `request_contact_info`: asks the recipient to share the phone number\n  their WhatsApp account carries. It belongs only on a utility or\n  marketing template, as that template's only button.\n\nThis is an open enum. Accept unrecognized values.\n",
       example: "url",
     },
     otp_type: {
       type: "string",
       minLength: 1,
       readOnly: true,
-      "x-extensible-enum": ["copy_code"],
+      "x-extensible-enum": ["copy_code", "one_tap", "zero_tap"],
       description:
-        "How the recipient receives the one-time passcode. Present on authentication-template OTP buttons.",
+        "How the recipient receives the one-time passcode: `copy_code`, `one_tap` or `zero_tap`. Present on an `otp` button.\nThis is an open enum. Accept unrecognized values.\n",
       example: "copy_code",
+    },
+    autofill_text: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The label WhatsApp writes on the autofill button. Present on a `one_tap` or `zero_tap` preview.\n",
+      example: "Autofill",
+    },
+    supported_apps: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The Android apps that receive the passcode. Present on a `one_tap` or `zero_tap` button in a draft. Once the language is submitted, the apps appear only in the button's `url`.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateSupportedApp",
+      },
+    },
+    zero_tap_terms_accepted: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether you accepted WhatsApp's zero-tap terms. Present on a `zero_tap` button in a draft. WhatsApp does not return it, so a submitted language reads back without it.\n",
+      example: true,
     },
     text: {
       type: "string",
@@ -25004,10 +25049,33 @@ export const WhatsAppTemplateButtonTypeWriteSchema = {
 export const WhatsAppTemplateButtonOtpTypeWriteSchema = {
   type: "string",
   minLength: 1,
-  enum: ["copy_code"],
+  enum: ["copy_code", "one_tap", "zero_tap"],
   description:
-    "How the recipient receives a one-time passcode. `copy_code` puts it on the clipboard.",
+    "How the recipient receives a one-time passcode.\n\n- `copy_code`: a button that copies the code, which the recipient pastes\n  into your app.\n- `one_tap`: an autofill button that hands the code to your Android app\n  when tapped.\n- `zero_tap`: hands the code to your Android app with no tap at all.\n\n`one_tap` and `zero_tap` work only on Android, with an app that has\ncompleted WhatsApp's handshake before you send. Otherwise WhatsApp shows the\ncopy-code button instead and reports no error.\n",
   example: "copy_code",
+} as const;
+
+export const WhatsAppTemplateSupportedAppWriteSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "An Android app that receives the passcode from a `one_tap` or `zero_tap` button. Both fields may be empty on a draft and are required before submission.\n",
+  properties: {
+    package_name: {
+      type: "string",
+      maxLength: 224,
+      description:
+        "The app's Android application ID. It needs at least two segments separated by dots, each starting with a letter, and uses only letters, digits and underscores.\n",
+      example: "com.example.otpapp",
+    },
+    signature_hash: {
+      type: "string",
+      maxLength: 11,
+      description:
+        "The 11-character hash of the app's signing key, from letters, digits, `+`, `/` and `=`.\n",
+      example: "K8a/AINcGX7",
+    },
+  },
 } as const;
 
 export const WhatsAppTemplateButtonWriteSchema = {
@@ -25026,13 +25094,13 @@ export const WhatsAppTemplateButtonWriteSchema = {
         },
       ],
       description:
-        "How the recipient receives the passcode. Send it only on an `otp` button.",
+        "How the recipient receives the passcode. Send it only on an `otp` button. `one_tap` and `zero_tap` work only on Android, with an app that has completed WhatsApp's handshake before you send. Otherwise WhatsApp shows the copy-code button instead and reports no error.\n",
     },
     text: {
       type: "string",
       maxLength: 25,
       description:
-        "The button's label, which each button type treats differently.\n\n- `url`, `quick_reply`, `phone_number`: your own label. Required.\n- `otp`: omit it. WhatsApp writes this label itself and reveals it only\n  once the language has been submitted.\n- `copy_code`: omit it. WhatsApp fixes this label and does not let you\n  change it.\n- `request_contact_info`: omit it. WhatsApp fixes this label too and\n  writes `Share Contact Info`, which is also what a submitted button\n  reads back as, so a read button can be written back unchanged.\n\nA draft takes any label, so this may be empty on a draft and is required\nonly before submission. A label a fixed-label button may not carry is\nrefused rather than silently replaced: the submit comes back as\n`valid: false` with an `errors` entry naming this field, in every\nlanguage.\n",
+        "The button's label, which each button type treats differently.\n\n- `url`, `quick_reply`, `phone_number`: your own label. Required.\n- `otp`: omit it, whatever the `otp_type`. WhatsApp writes and\n  translates this label itself. The template preview shows it before\n  you submit.\n- `copy_code`: omit it. WhatsApp fixes this label and does not let you\n  change it.\n- `request_contact_info`: omit it. WhatsApp fixes this label too and\n  writes `Share Contact Info`, which is also what a submitted button\n  reads back as, so a read button can be written back unchanged.\n\nA draft takes any label, so this may be empty on a draft and is required\nonly before submission. A label a fixed-label button may not carry is\nrefused rather than silently replaced: the submit comes back as\n`valid: false` with an `errors` entry naming this field, in every\nlanguage.\n",
       example: "Track order",
     },
     url: {
@@ -25048,6 +25116,21 @@ export const WhatsAppTemplateButtonWriteSchema = {
       description:
         "The number a `phone_number` button dials, in international format. Some countries publish numbers with a leading zero after the country calling code; WhatsApp strips that zero, so give a number that dials without it. May be empty on a draft; required before submission.\n",
       example: "+14155550100",
+    },
+    supported_apps: {
+      type: "array",
+      maxItems: 5,
+      description:
+        "The Android apps that receive the passcode, up to five. Send it only on an `otp` button whose `otp_type` is `one_tap` or `zero_tap`, where at least one app is required before submission.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateSupportedAppWrite",
+      },
+    },
+    zero_tap_terms_accepted: {
+      type: "boolean",
+      description:
+        "Your acceptance of WhatsApp's terms for zero-tap, under which you make sure your users expect the code to be filled in automatically. Send it only on an `otp` button whose `otp_type` is `zero_tap`, where it must be `true` before submission.\n",
+      example: true,
     },
     example_parameters: {
       type: "array",

@@ -10966,6 +10966,20 @@ export type WhatsAppTemplateExampleParameter = {
   readonly name?: string;
 };
 
+/**
+ * An Android app that receives the passcode from a `one_tap` or `zero_tap` button.
+ */
+export type WhatsAppTemplateSupportedApp = {
+  /**
+   * The app's Android application ID.
+   */
+  readonly package_name?: string;
+  /**
+   * The 11-character hash of the app's signing key.
+   */
+  readonly signature_hash?: string;
+};
+
 export type WhatsAppTemplateButton = {
   /**
    * The button's behavior.
@@ -10973,8 +10987,13 @@ export type WhatsAppTemplateButton = {
    * - `url`: opens a link.
    * - `quick_reply`: sends its own label back to you as an inbound message.
    * - `phone_number`: dials the number it carries.
-   * - `otp`: copies a one-time passcode. It belongs only on an authentication
-   *   template, and that template takes no other button type.
+   * - `otp`: delivers a one-time passcode, in the way its `otp_type` names.
+   *   It belongs only on an authentication template, and that template
+   *   takes no other button type. Once the language is submitted, WhatsApp
+   *   returns this button as a `url` button whose address names the
+   *   delivery type, so a submitted language reads back with `url`. It
+   *   also adds a `quick_reply` button labeled `I didn't request a code`,
+   *   which the preview shows too.
    * - `copy_code`: copies a coupon code to the recipient's clipboard. It
    *   belongs only on a marketing template, which takes at most one.
    * - `request_contact_info`: asks the recipient to share the phone number
@@ -10986,9 +11005,26 @@ export type WhatsAppTemplateButton = {
    */
   readonly type: string;
   /**
-   * How the recipient receives the one-time passcode. Present on authentication-template OTP buttons.
+   * How the recipient receives the one-time passcode: `copy_code`, `one_tap` or `zero_tap`. Present on an `otp` button.
+   * This is an open enum. Accept unrecognized values.
+   *
    */
   readonly otp_type?: string;
+  /**
+   * The label WhatsApp writes on the autofill button. Present on a `one_tap` or `zero_tap` preview.
+   *
+   */
+  readonly autofill_text?: string;
+  /**
+   * The Android apps that receive the passcode. Present on a `one_tap` or `zero_tap` button in a draft. Once the language is submitted, the apps appear only in the button's `url`.
+   *
+   */
+  readonly supported_apps?: Array<WhatsAppTemplateSupportedApp>;
+  /**
+   * Whether you accepted WhatsApp's zero-tap terms. Present on a `zero_tap` button in a draft. WhatsApp does not return it, so a submitted language reads back without it.
+   *
+   */
+  readonly zero_tap_terms_accepted?: boolean;
   /**
    * The button's label. Absent on an authentication template's passcode button until the language has been submitted, since WhatsApp writes that label itself. Absent on a `request_contact_info` draft for a related reason: WhatsApp fixes that label, so a draft that carried it reads back without it. Once the language is submitted, this carries the label WhatsApp wrote, which is `Share Contact Info` in every language today.
    *
@@ -13810,9 +13846,38 @@ export type WhatsAppTemplateButtonTypeWrite =
   | "request_contact_info";
 
 /**
- * How the recipient receives a one-time passcode. `copy_code` puts it on the clipboard.
+ * How the recipient receives a one-time passcode.
+ *
+ * - `copy_code`: a button that copies the code, which the recipient pastes
+ *   into your app.
+ * - `one_tap`: an autofill button that hands the code to your Android app
+ *   when tapped.
+ * - `zero_tap`: hands the code to your Android app with no tap at all.
+ *
+ * `one_tap` and `zero_tap` work only on Android, with an app that has
+ * completed WhatsApp's handshake before you send. Otherwise WhatsApp shows the
+ * copy-code button instead and reports no error.
+ *
  */
-export type WhatsAppTemplateButtonOtpTypeWrite = "copy_code";
+export type WhatsAppTemplateButtonOtpTypeWrite =
+  "copy_code" | "one_tap" | "zero_tap";
+
+/**
+ * An Android app that receives the passcode from a `one_tap` or `zero_tap` button. Both fields may be empty on a draft and are required before submission.
+ *
+ */
+export type WhatsAppTemplateSupportedAppWrite = {
+  /**
+   * The app's Android application ID. It needs at least two segments separated by dots, each starting with a letter, and uses only letters, digits and underscores.
+   *
+   */
+  package_name?: string;
+  /**
+   * The 11-character hash of the app's signing key, from letters, digits, `+`, `/` and `=`.
+   *
+   */
+  signature_hash?: string;
+};
 
 /**
  * One button, as written to a draft.
@@ -13820,15 +13885,17 @@ export type WhatsAppTemplateButtonOtpTypeWrite = "copy_code";
 export type WhatsAppTemplateButtonWrite = {
   type: WhatsAppTemplateButtonTypeWrite;
   /**
-   * How the recipient receives the passcode. Send it only on an `otp` button.
+   * How the recipient receives the passcode. Send it only on an `otp` button. `one_tap` and `zero_tap` work only on Android, with an app that has completed WhatsApp's handshake before you send. Otherwise WhatsApp shows the copy-code button instead and reports no error.
+   *
    */
   otp_type?: WhatsAppTemplateButtonOtpTypeWrite;
   /**
    * The button's label, which each button type treats differently.
    *
    * - `url`, `quick_reply`, `phone_number`: your own label. Required.
-   * - `otp`: omit it. WhatsApp writes this label itself and reveals it only
-   *   once the language has been submitted.
+   * - `otp`: omit it, whatever the `otp_type`. WhatsApp writes and
+   *   translates this label itself. The template preview shows it before
+   *   you submit.
    * - `copy_code`: omit it. WhatsApp fixes this label and does not let you
    *   change it.
    * - `request_contact_info`: omit it. WhatsApp fixes this label too and
@@ -13853,6 +13920,16 @@ export type WhatsAppTemplateButtonWrite = {
    *
    */
   phone_number?: string;
+  /**
+   * The Android apps that receive the passcode, up to five. Send it only on an `otp` button whose `otp_type` is `one_tap` or `zero_tap`, where at least one app is required before submission.
+   *
+   */
+  supported_apps?: Array<WhatsAppTemplateSupportedAppWrite>;
+  /**
+   * Your acceptance of WhatsApp's terms for zero-tap, under which you make sure your users expect the code to be filled in automatically. Send it only on an `otp` button whose `otp_type` is `zero_tap`, where it must be `true` before submission.
+   *
+   */
+  zero_tap_terms_accepted?: boolean;
   /**
    * The value that fills the variable in `url`, which WhatsApp reviews in the filled address. Send only the value, so a `{{1}}` standing for an order number takes `A-4192`. Required whenever `url` carries a variable. Also required on a `copy_code` button as one `text` entry. The entry carries a sample coupon code of at most 20 characters for WhatsApp to review. Each recipient copies the code you provide when sending the message.
    *

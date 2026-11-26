@@ -5259,6 +5259,8 @@ export type {
   WhatsAppTemplateSubmitProblem,
   WhatsAppTemplateSubmitResult,
   WhatsAppTemplateSubmitResultWritable,
+  WhatsAppTemplateSupportedApp,
+  WhatsAppTemplateSupportedAppWrite,
   WhatsAppTemplateUpdate,
   WhatsAppTemplateVersion,
   WhatsAppTemplateVersionId,
