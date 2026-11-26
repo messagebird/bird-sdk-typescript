@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.150.0
+
+- Voice sequence dial traces can include the selected SIP user ID on the command span.
+
 ## 0.149.0
 
 - Ring group members now carry `type`, which is `user` for a workspace user; add it where you build a member object yourself, such as in a test fixture.
