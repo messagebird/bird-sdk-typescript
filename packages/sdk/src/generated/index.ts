@@ -3982,6 +3982,7 @@ export type {
   NumbersOrderList,
   NumbersOrderListWritable,
   NumbersOrderStatus,
+  NumbersOrderWritable,
   NumberType,
   NumberUpdate,
   NumberWritable,

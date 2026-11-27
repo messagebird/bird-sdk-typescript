@@ -4051,7 +4051,10 @@ export const listSmsMessages = <ThrowOnError extends boolean = false>(
  *
  * The `202 Accepted` response confirms acceptance for asynchronous delivery.
  * Follow [Get an SMS message](/docs/api/reference/get-sms-message) or `sms.*`
- * webhook events for delivery status. SMS is billed per segment; MMS uses one
+ * webhook events for delivery status. Sends to the capacity-test range
+ * (`+15005551000` to `+15005551999`) stop at `202`: they are dropped before
+ * charging or storage, so polling their `id` returns `404` and no webhooks fire.
+ * SMS is billed per segment; MMS uses one
  * message unit and separate MMS rates. Media must remain publicly fetchable;
  * the carrier's 600 KiB per-file and 900 KiB total limits are checked during delivery.
  *
@@ -4105,6 +4108,9 @@ export const createSmsMessage = <ThrowOnError extends boolean = false>(
  * sent). A batch from a workspace with no wallet balance fails with a `402`.
  * The `202` response lists the accepted messages in submission order; each
  * delivers asynchronously and is tracked individually, like a single send.
+ * Items sent to the capacity-test range (`+15005551000` to `+15005551999`) stop
+ * at `202` with no charge, stored record (`404` on reads), or webhooks, while
+ * ordinary items in the same batch progress normally.
  *
  */
 export const createSmsMessageBatch = <ThrowOnError extends boolean = false>(
@@ -16293,6 +16299,10 @@ export const listNumbersOrders = <ThrowOnError extends boolean = false>(
  * The completed order remains in history. An order that cannot complete in the request
  * returns `202`; poll `GET /v1/numbers/orders/{order_id}` until it is
  * `completed` or `failed`.
+ *
+ * Some countries require ownership paperwork before a number can send SMS or handle voice
+ * calls. A completed order then reports the number's `ownership`, whose `next` lists what
+ * to do.
  *
  * A `412` means required identity verification is incomplete or organization
  * eligibility prevents the purchase. Follow the error's recovery guidance:

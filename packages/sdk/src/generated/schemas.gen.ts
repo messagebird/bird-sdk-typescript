@@ -24470,6 +24470,43 @@ export const WhatsAppTemplateLanguageStatusSchema = {
     "Language review and health status:\n\n- `approved`: Passed review and can be sent.\n- `pending`: Awaiting Meta's verdict, with no estimate. This includes a submission Meta has not yet confirmed receiving. Bird cannot speed it up.\n- `rejected`: Failed review.\n- `paused` or `disabled`: Sending is suspended.\n- `in_appeal`: A decision is being appealed.\n- `pending_deletion`: Scheduled for deletion by Meta.\n- `limit_exceeded`: Sending is blocked by a limit.\n- `archived`: Reclaimed after 12 months without use; recoverable for 28 days.\n- `deleted`: Permanently deleted.\n- `submit_failed`: A submission or a deletion did not complete and will not be retried. `error.description` says why, and `error.meta_error_code` is set only where WhatsApp itself refused.\n\nThis is an open enum. Accept unrecognized values.\n",
 } as const;
 
+export const WhatsAppTemplateQualityScoreSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["green", "yellow", "red", "unknown"],
+  description:
+    "Meta's quality rating for one language of a template, derived from how recipients respond to messages sent from it. The `red` score is the leading indicator of a pause. Reaching Meta's lowest rating pauses sending from that language for three hours; a second time pauses it for six, and a third disables it. The `unknown` score is a value Meta reports. When Meta has not rated the language, the rating object is absent. This is an open enum. Accept unrecognized values.\n",
+  example: "green",
+} as const;
+
+export const WhatsAppTemplateQualitySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["current_score", "updated_at"],
+  properties: {
+    current_score: {
+      $ref: "#/components/schemas/WhatsAppTemplateQualityScore",
+      description: "Meta's rating for this language as of `updated_at`.",
+    },
+    previous_score: {
+      $ref: "#/components/schemas/WhatsAppTemplateQualityScore",
+      description:
+        "The rating this language held before the most recent change. Absent when Meta has rated it only once. Usually differs from `current_score`, but Meta sometimes reports both as the same value, so compare timestamps rather than assuming a transition.\n",
+    },
+    updated_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the rating last changed. A re-evaluation that lands on the same rating does not move it, so this answers how long the language has held its current rating.\n",
+      example: "2026-07-26T16:41:00Z",
+    },
+  },
+  description:
+    "Meta's quality rating for one language, with the rating it moved from and when it moved. Once Meta rates a language, list or get the template, or get the individual language on its live version, to read the rating. Version summaries always omit quality, including the live version's summary. Superseded versions carry no rating.\n",
+} as const;
+
 export const WhatsAppTemplateRejectionCategorySchema = {
   type: "string",
   minLength: 1,
@@ -24551,6 +24588,12 @@ export const WhatsAppTemplateLanguageStateSchema = {
       ],
       description:
         "On a template, where this language stands on the version currently in service. On a version, what that version's submission did with this language. Absent on a draft, which has not been submitted.\n",
+    },
+    quality: {
+      $ref: "#/components/schemas/WhatsAppTemplateQuality",
+      readOnly: true,
+      description:
+        "On a template, Meta's quality rating for this language on the live version. Omitted until Meta reports a rating and on version summaries.",
     },
     submitted_at: {
       type: ["string", "null"],
@@ -26126,43 +26169,6 @@ export const WhatsAppTemplateContentHashSchema = {
     "A hash over the serialized `components` this API surfaces, prefixed with the algorithm that produced it (`sha256:`) so the algorithm can change without the field becoming ambiguous. It tells you whether a language differs without transferring its content. Compare hashes only within one version of this API. Adding a field to the component shape changes every hash even when the underlying content is unchanged. Email's field of the same name carries bare hex and predates this form.\n",
   example:
     "sha256:9f2c4e1a7b03d85fbc6e29d417a05e8c3b1d9f76a2e4c018d53b7f9a6c2e18d4",
-} as const;
-
-export const WhatsAppTemplateQualityScoreSchema = {
-  type: "string",
-  minLength: 1,
-  "x-extensible-enum": ["green", "yellow", "red", "unknown"],
-  description:
-    "Meta's quality rating for one language of a template, derived from how recipients respond to messages sent from it. The `red` score is the leading indicator of a pause. Reaching Meta's lowest rating pauses sending from that language for three hours; a second time pauses it for six, and a third disables it. The `unknown` score is a value Meta reports. When Meta has not rated the language, the rating object is absent. This is an open enum. Accept unrecognized values.\n",
-  example: "green",
-} as const;
-
-export const WhatsAppTemplateQualitySchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["current_score", "updated_at"],
-  properties: {
-    current_score: {
-      $ref: "#/components/schemas/WhatsAppTemplateQualityScore",
-      description: "Meta's rating for this language as of `updated_at`.",
-    },
-    previous_score: {
-      $ref: "#/components/schemas/WhatsAppTemplateQualityScore",
-      description:
-        "The rating this language held before the most recent change. Absent when Meta has rated it only once. Usually differs from `current_score`, but Meta sometimes reports both as the same value, so compare timestamps rather than assuming a transition.\n",
-    },
-    updated_at: {
-      type: "string",
-      minLength: 1,
-      format: "date-time",
-      readOnly: true,
-      description:
-        "When the rating last changed. A re-evaluation that lands on the same rating does not move it, so this answers how long the language has held its current rating.\n",
-      example: "2026-07-26T16:41:00Z",
-    },
-  },
-  description:
-    "Meta's quality rating for one language, with the rating it moved from and when it moved. Present only once Meta has rated the language, and only on the version currently in service. A superseded version's content carries no rating.\n",
 } as const;
 
 export const WhatsAppTemplatePauseReasonSchema = {
@@ -54978,6 +54984,26 @@ export const AvailableNumberSchema = {
       description:
         "Name of the area this local number belongs to, for example `Amsterdam`: the area a `number_area` `ownership_address_scope` refers to. Text for display; the address is not checked against it before purchase. Omitted when the number has no `number_area` rule or the area is not known.",
     },
+    ownership_requirements: {
+      description:
+        "Where to read what this number's ownership paperwork asks for, before you buy it. Call the named operation with `params` to get the form for the number's country and number type: every field, the documents it takes and its guidance, unanswered. That read needs compliance read access, which this search does not. Present when a form is published for the number's country and number type, including when `ownership_registration_required` is false because your organization is exempt from the paperwork. Omitted when no form is published, when the form could not be looked up for this response, and on admin supplier searches.",
+      allOf: [
+        {
+          $ref: "#/components/schemas/NextAction",
+        },
+      ],
+      example: {
+        kind: "operation",
+        description:
+          "See what this country requires to prove you own this number",
+        operation: "getWorkspaceComplianceRequirements",
+        params: {
+          subject_kind: "number",
+          country_code: "US",
+          program: "mobile",
+        },
+      },
+    },
     pricing: {
       description:
         "What your organization pays for this number. Omitted on admin supplier searches, which have no organization to price for.",
@@ -55121,6 +55147,19 @@ export const NumbersOrderSchema = {
       format: "date-time",
       minLength: 1,
       readOnly: true,
+    },
+    ownership: {
+      readOnly: true,
+      description:
+        "Ownership paperwork and activation progress for the number this order bought: the same object `GET /v1/numbers/{number_id}` reports. Reported once the order is `completed`, when you create an order or read one. `null` when no ownership requirements, block or decision apply to the number, when requirements could not be read and no block or decision is recorded, and after the number is released. Absent from order lists and while the order is in progress or failed. Also absent when the number could not be read; read the order again then. Follow its `next` to see what the country requires and to send your answers.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/NumberOwnership",
+        },
+        {
+          type: "null",
+        },
+      ],
     },
   },
 } as const;
@@ -65600,6 +65639,25 @@ export const WhatsAppGroupJoinRequestListWritableSchema = {
   ],
 } as const;
 
+export const WhatsAppTemplateQualityWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["current_score"],
+  properties: {
+    current_score: {
+      $ref: "#/components/schemas/WhatsAppTemplateQualityScore",
+      description: "Meta's rating for this language as of `updated_at`.",
+    },
+    previous_score: {
+      $ref: "#/components/schemas/WhatsAppTemplateQualityScore",
+      description:
+        "The rating this language held before the most recent change. Absent when Meta has rated it only once. Usually differs from `current_score`, but Meta sometimes reports both as the same value, so compare timestamps rather than assuming a transition.\n",
+    },
+  },
+  description:
+    "Meta's quality rating for one language, with the rating it moved from and when it moved. Once Meta rates a language, list or get the template, or get the individual language on its live version, to read the rating. Version summaries always omit quality, including the live version's summary. Superseded versions carry no rating.\n",
+} as const;
+
 export const WhatsAppTemplateRejectionWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -65961,25 +66019,6 @@ export const WhatsAppTemplateLanguageListWritableSchema = {
       },
     },
   },
-} as const;
-
-export const WhatsAppTemplateQualityWritableSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["current_score"],
-  properties: {
-    current_score: {
-      $ref: "#/components/schemas/WhatsAppTemplateQualityScore",
-      description: "Meta's rating for this language as of `updated_at`.",
-    },
-    previous_score: {
-      $ref: "#/components/schemas/WhatsAppTemplateQualityScore",
-      description:
-        "The rating this language held before the most recent change. Absent when Meta has rated it only once. Usually differs from `current_score`, but Meta sometimes reports both as the same value, so compare timestamps rather than assuming a transition.\n",
-    },
-  },
-  description:
-    "Meta's quality rating for one language, with the rating it moved from and when it moved. Present only once Meta has rated the language, and only on the version currently in service. A superseded version's content carries no rating.\n",
 } as const;
 
 export const WhatsAppTemplateLanguageWritableSchema = {
@@ -74086,6 +74125,26 @@ export const AvailableNumberWritableSchema = {
       description:
         "Name of the area this local number belongs to, for example `Amsterdam`: the area a `number_area` `ownership_address_scope` refers to. Text for display; the address is not checked against it before purchase. Omitted when the number has no `number_area` rule or the area is not known.",
     },
+    ownership_requirements: {
+      description:
+        "Where to read what this number's ownership paperwork asks for, before you buy it. Call the named operation with `params` to get the form for the number's country and number type: every field, the documents it takes and its guidance, unanswered. That read needs compliance read access, which this search does not. Present when a form is published for the number's country and number type, including when `ownership_registration_required` is false because your organization is exempt from the paperwork. Omitted when no form is published, when the form could not be looked up for this response, and on admin supplier searches.",
+      allOf: [
+        {
+          $ref: "#/components/schemas/NextAction",
+        },
+      ],
+      example: {
+        kind: "operation",
+        description:
+          "See what this country requires to prove you own this number",
+        operation: "getWorkspaceComplianceRequirements",
+        params: {
+          subject_kind: "number",
+          country_code: "US",
+          program: "mobile",
+        },
+      },
+    },
     pricing: {
       description:
         "What your organization pays for this number. Omitted on admin supplier searches, which have no organization to price for.",
@@ -74118,6 +74177,11 @@ export const AvailableNumberListWritableSchema = {
   ],
 } as const;
 
+export const NumbersOrderWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+} as const;
+
 export const NumbersOrderListWritableSchema = {
   allOf: [
     {
@@ -74126,6 +74190,9 @@ export const NumbersOrderListWritableSchema = {
       properties: {
         data: {
           type: "array",
+          items: {
+            $ref: "#/components/schemas/NumbersOrderWritable",
+          },
         },
       },
     },

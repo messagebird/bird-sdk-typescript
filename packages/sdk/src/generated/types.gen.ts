@@ -13504,6 +13504,34 @@ export type WhatsAppTemplateLanguageStatus =
   | (string & {});
 
 /**
+ * Meta's quality rating for one language of a template, derived from how recipients respond to messages sent from it. The `red` score is the leading indicator of a pause. Reaching Meta's lowest rating pauses sending from that language for three hours; a second time pauses it for six, and a third disables it. The `unknown` score is a value Meta reports. When Meta has not rated the language, the rating object is absent. This is an open enum. Accept unrecognized values.
+ *
+ */
+export type WhatsAppTemplateQualityScore =
+  "green" | "yellow" | "red" | "unknown" | (string & {});
+
+/**
+ * Meta's quality rating for one language, with the rating it moved from and when it moved. Once Meta rates a language, list or get the template, or get the individual language on its live version, to read the rating. Version summaries always omit quality, including the live version's summary. Superseded versions carry no rating.
+ *
+ */
+export type WhatsAppTemplateQuality = {
+  /**
+   * Meta's rating for this language as of `updated_at`.
+   */
+  current_score: WhatsAppTemplateQualityScore;
+  /**
+   * The rating this language held before the most recent change. Absent when Meta has rated it only once. Usually differs from `current_score`, but Meta sometimes reports both as the same value, so compare timestamps rather than assuming a transition.
+   *
+   */
+  previous_score?: WhatsAppTemplateQualityScore;
+  /**
+   * When the rating last changed. A re-evaluation that lands on the same rating does not move it, so this answers how long the language has held its current rating.
+   *
+   */
+  readonly updated_at: string;
+};
+
+/**
  * Why Meta refused a language's content, in Meta's own vocabulary, lowercased. Read it with `reason`, which carries Meta's human-written detail, and `recommendation`, which carries its suggested fix. This is an open enum. Accept unrecognized values.
  *
  */
@@ -13561,6 +13589,10 @@ export type WhatsAppTemplateLanguageState = {
    *
    */
   status?: WhatsAppTemplateLanguageStatus;
+  /**
+   * On a template, Meta's quality rating for this language on the live version. Omitted until Meta reports a rating and on version summaries.
+   */
+  readonly quality?: WhatsAppTemplateQuality;
   /**
    * When this language's content was last submitted to Meta. Null on a draft, which has not been submitted, and null for a built-in template's language, shipped already approved rather than submitted on your behalf.
    *
@@ -14511,34 +14543,6 @@ export type WhatsAppTemplateOptimizationSpec = {
  *
  */
 export type WhatsAppTemplateContentHash = string;
-
-/**
- * Meta's quality rating for one language of a template, derived from how recipients respond to messages sent from it. The `red` score is the leading indicator of a pause. Reaching Meta's lowest rating pauses sending from that language for three hours; a second time pauses it for six, and a third disables it. The `unknown` score is a value Meta reports. When Meta has not rated the language, the rating object is absent. This is an open enum. Accept unrecognized values.
- *
- */
-export type WhatsAppTemplateQualityScore =
-  "green" | "yellow" | "red" | "unknown" | (string & {});
-
-/**
- * Meta's quality rating for one language, with the rating it moved from and when it moved. Present only once Meta has rated the language, and only on the version currently in service. A superseded version's content carries no rating.
- *
- */
-export type WhatsAppTemplateQuality = {
-  /**
-   * Meta's rating for this language as of `updated_at`.
-   */
-  current_score: WhatsAppTemplateQualityScore;
-  /**
-   * The rating this language held before the most recent change. Absent when Meta has rated it only once. Usually differs from `current_score`, but Meta sometimes reports both as the same value, so compare timestamps rather than assuming a transition.
-   *
-   */
-  previous_score?: WhatsAppTemplateQualityScore;
-  /**
-   * When the rating last changed. A re-evaluation that lands on the same rating does not move it, so this answers how long the language has held its current rating.
-   *
-   */
-  readonly updated_at: string;
-};
 
 /**
  * WhatsApp's label for why it took a language out of service: its `other_info.title`, lowercased. `first_pause` and `second_pause` are the first and second pauses for a low quality rating, which last three and six hours. `rate_limiting_pause` is a pause WhatsApp applied to limit sending. `disabled` means WhatsApp stopped the language from sending after repeated pauses. This is an open enum. Accept unrecognized values.
@@ -30281,6 +30285,10 @@ export type AvailableNumber = {
    */
   ownership_address_area_name?: string;
   /**
+   * Where to read what this number's ownership paperwork asks for, before you buy it. Call the named operation with `params` to get the form for the number's country and number type: every field, the documents it takes and its guidance, unanswered. That read needs compliance read access, which this search does not. Present when a form is published for the number's country and number type, including when `ownership_registration_required` is false because your organization is exempt from the paperwork. Omitted when no form is published, when the form could not be looked up for this response, and on admin supplier searches.
+   */
+  ownership_requirements?: NextAction;
+  /**
    * What your organization pays for this number. Omitted on admin supplier searches, which have no organization to price for.
    */
   pricing?: AvailableNumberPricing;
@@ -30343,6 +30351,11 @@ export type NumbersOrder = {
   readonly completed_at?: string | null;
   readonly created_at: string;
   readonly updated_at: string;
+  /**
+   * Ownership paperwork and activation progress for the number this order bought: the same object `GET /v1/numbers/{number_id}` reports. Reported once the order is `completed`, when you create an order or read one. `null` when no ownership requirements, block or decision apply to the number, when requirements could not be read and no block or decision is recorded, and after the number is released. Absent from order lists and while the order is in progress or failed. Also absent when the number could not be read; read the order again then. Follow its `next` to see what the country requires and to send your answers.
+   *
+   */
+  readonly ownership?: NumberOwnership | null;
 };
 
 export type NumbersOrderList = {
@@ -36004,6 +36017,22 @@ export type WhatsAppGroupJoinRequestListWritable = {
 } & ListEnvelope;
 
 /**
+ * Meta's quality rating for one language, with the rating it moved from and when it moved. Once Meta rates a language, list or get the template, or get the individual language on its live version, to read the rating. Version summaries always omit quality, including the live version's summary. Superseded versions carry no rating.
+ *
+ */
+export type WhatsAppTemplateQualityWritable = {
+  /**
+   * Meta's rating for this language as of `updated_at`.
+   */
+  current_score: WhatsAppTemplateQualityScore;
+  /**
+   * The rating this language held before the most recent change. Absent when Meta has rated it only once. Usually differs from `current_score`, but Meta sometimes reports both as the same value, so compare timestamps rather than assuming a transition.
+   *
+   */
+  previous_score?: WhatsAppTemplateQualityScore;
+};
+
+/**
  * Why Meta refused a language's content, and what it says about fixing it. Present when `status` is `rejected`.
  *
  */
@@ -36202,22 +36231,6 @@ export type WhatsAppTemplateLanguageListWritable = {
    * Every language this version holds, without content.
    */
   data: Array<WhatsAppTemplateLanguageSummaryWritable>;
-};
-
-/**
- * Meta's quality rating for one language, with the rating it moved from and when it moved. Present only once Meta has rated the language, and only on the version currently in service. A superseded version's content carries no rating.
- *
- */
-export type WhatsAppTemplateQualityWritable = {
-  /**
-   * Meta's rating for this language as of `updated_at`.
-   */
-  current_score: WhatsAppTemplateQualityScore;
-  /**
-   * The rating this language held before the most recent change. Absent when Meta has rated it only once. Usually differs from `current_score`, but Meta sometimes reports both as the same value, so compare timestamps rather than assuming a transition.
-   *
-   */
-  previous_score?: WhatsAppTemplateQualityScore;
 };
 
 /**
@@ -40359,6 +40372,10 @@ export type AvailableNumberWritable = {
    */
   ownership_address_area_name?: string;
   /**
+   * Where to read what this number's ownership paperwork asks for, before you buy it. Call the named operation with `params` to get the form for the number's country and number type: every field, the documents it takes and its guidance, unanswered. That read needs compliance read access, which this search does not. Present when a form is published for the number's country and number type, including when `ownership_registration_required` is false because your organization is exempt from the paperwork. Omitted when no form is published, when the form could not be looked up for this response, and on admin supplier searches.
+   */
+  ownership_requirements?: NextAction;
+  /**
    * What your organization pays for this number. Omitted on admin supplier searches, which have no organization to price for.
    */
   pricing?: AvailableNumberPricingWritable;
@@ -40368,8 +40385,12 @@ export type AvailableNumberListWritable = {
   data: Array<AvailableNumberWritable>;
 } & ListEnvelope;
 
+export type NumbersOrderWritable = {
+  [key: string]: never;
+};
+
 export type NumbersOrderListWritable = {
-  data: Array<unknown>;
+  data: Array<NumbersOrderWritable>;
 } & ListEnvelope;
 
 export type BillingResolvedPriceWritable = {
